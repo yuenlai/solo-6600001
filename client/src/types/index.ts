@@ -1,0 +1,49 @@
+export interface BoardElement {
+  id: string;
+  type: 'path' | 'rect' | 'circle' | 'text' | 'sticky-note' | 'line' | 'image';
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  text?: string;
+  points?: number[];
+  rotation?: number;
+  opacity?: number;
+}
+
+export interface Layer {
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  order: number;
+  elements: BoardElement[];
+}
+
+export interface Board {
+  _id: string;
+  name: string;
+  ownerId: string;
+  collaborators: string[];
+  layers: Layer[];
+  width: number;
+  height: number;
+  backgroundColor: string;
+}
+
+export interface CursorPosition {
+  socketId: string;
+  username: string;
+  x: number;
+  y: number;
+}
+
+export interface CanvasTransform {
+  scale: number;
+  translateX: number;
+  translateY: number;
+}
+
+export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'eraser';
