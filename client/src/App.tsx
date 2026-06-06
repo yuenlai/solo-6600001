@@ -1,82 +1,135 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WhiteboardCanvas } from './components/WhiteboardCanvas';
 import { Toolbar } from './components/Toolbar';
 import { LayerPanel } from './components/LayerPanel';
 import { CursorOverlay } from './components/CursorOverlay';
+import { Dashboard } from './components/Dashboard';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
-import { Board, BoardElement, CursorPosition, Layer, CanvasTransform } from './types';
+import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType } from './types';
 
 const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const {
-    setBoard, updateCursor, removeCursor, setCursors, username
+    setBoard, updateCursor, removeCursor, setCursors, username, board
   } = useWhiteboardStore();
 
   useEffect(() => {
-    // Create a default board for demo
-    const defaultBoard: Board = {
-      _id: 'demo-board-1',
-      name: '协作白板 Demo',
-      ownerId: 'user-1',
-      collaborators: [],
-      layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
-      width: 3000,
-      height: 2000,
-      backgroundColor: '#f5f5f5'
-    };
-    setBoard(defaultBoard);
+    if (currentView === 'board' && activeBoard) {
+      setBoard(activeBoard);
 
-    // Connect to socket
-    const socket = socketService.connect();
-    socketService.joinBoard(defaultBoard._id, username);
+      const socket = socketService.connect();
+      socketService.joinBoard(activeBoard._id, username);
 
-    // Socket event listeners
-    socketService.onUserJoined((data) => {
-      console.log(`${data.username} 加入了白板`);
-    });
-    socketService.onUserLeft((data) => {
-      removeCursor(data.socketId);
-    });
-    socketService.onActiveUsers((users) => {
-      setCursors(users);
-    });
-    socketService.onCursorUpdate((data: CursorPosition) => {
-      updateCursor(data);
-    });
-    socketService.onElementAdded((data: { element: BoardElement; layerIndex: number }) => {
-      const { board } = useWhiteboardStore.getState();
-      if (board) {
-        const layers = [...board.layers];
-        layers[data.layerIndex] = {
-          ...layers[data.layerIndex],
-          elements: [...layers[data.layerIndex].elements, data.element]
-        };
-        setBoard({ ...board, layers });
-      }
-    });
-    socketService.onLayersUpdated((data: { layers: Layer[] }) => {
-      const { board } = useWhiteboardStore.getState();
-      if (board) {
-        setBoard({ ...board, layers: data.layers });
-      }
-    });
-    socketService.onCanvasTransformed((data: { transform: CanvasTransform }) => {
-      useWhiteboardStore.getState().setCanvasTransform(data.transform);
-    });
+      socketService.onUserJoined((data) => {
+        console.log(`${data.username} 加入了白板`);
+      });
+      socketService.onUserLeft((data) => {
+        removeCursor(data.socketId);
+      });
+      socketService.onActiveUsers((users) => {
+        setCursors(users);
+      });
+      socketService.onCursorUpdate((data: CursorPosition) => {
+        updateCursor(data);
+      });
+      socketService.onElementAdded((data: { element: BoardElement; layerIndex: number }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const layers = [...currentBoard.layers];
+          layers[data.layerIndex] = {
+            ...layers[data.layerIndex],
+            elements: [...layers[data.layerIndex].elements, data.element]
+          };
+          setBoard({ ...currentBoard, layers });
+        }
+      });
+      socketService.onLayersUpdated((data: { layers: Layer[] }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          setBoard({ ...currentBoard, layers: data.layers });
+        }
+      });
+      socketService.onCanvasTransformed((data: { transform: CanvasTransform }) => {
+        useWhiteboardStore.getState().setCanvasTransform(data.transform);
+      });
 
-    return () => {
-      socketService.disconnect();
-    };
-  }, []);
+      return () => {
+        socketService.disconnect();
+      };
+    }
+  }, [currentView, activeBoard]);
+
+  const handleBoardSelect = (boardItem: Board) => {
+    setActiveBoard(boardItem);
+    setCurrentView('board');
+  };
+
+  const handleBackToDashboard = () => {
+    setCurrentView('dashboard');
+    setActiveBoard(null);
+  };
+
+  if (currentView === 'dashboard') {
+    return <Dashboard onBoardSelect={handleBoardSelect} />;
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-      <Toolbar />
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <WhiteboardCanvas />
-        <CursorOverlay />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+      <div style={{
+        height: '48px',
+        background: '#fff',
+        borderBottom: '1px solid #e5e7eb',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 16px',
+        gap: '12px',
+      }}>
+        <button
+          onClick={handleBackToDashboard}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: '#374151',
+            background: '#f3f4f6',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#e5e7eb';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f3f4f6';
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          返回工作台
+        </button>
+        <div style={{
+          fontSize: '14px',
+          fontWeight: 600,
+          color: '#1a1a1a',
+        }}>
+          {activeBoard?.name}
+        </div>
       </div>
-      <LayerPanel />
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <Toolbar />
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <WhiteboardCanvas />
+          <CursorOverlay />
+        </div>
+        <LayerPanel />
+      </div>
     </div>
   );
 };

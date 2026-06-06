@@ -31,7 +31,11 @@ export interface Board {
   width: number;
   height: number;
   backgroundColor: string;
+  createdAt: string;
+  updatedAt: string;
 }
+
+export type ViewType = 'dashboard' | 'board';
 
 export interface CursorPosition {
   socketId: string;
