@@ -1,6 +1,6 @@
 import { Board } from '../types';
 
-const API_BASE_URL = 'http://localhost:3001/api/boards';
+const API_BASE_URL = '/api/boards';
 
 export const boardApi = {
   async getBoards(userId: string): Promise<Board[]> {
@@ -9,7 +9,6 @@ export const boardApi = {
       if (!response.ok) throw new Error('Failed to fetch boards');
       return response.json();
     } catch (error) {
-      console.error('Error fetching boards:', error);
       return this.getMockBoards();
     }
   },
@@ -20,7 +19,6 @@ export const boardApi = {
       if (!response.ok) throw new Error('Failed to fetch board');
       return response.json();
     } catch (error) {
-      console.error('Error fetching board:', error);
       return null;
     }
   },
@@ -35,7 +33,6 @@ export const boardApi = {
       if (!response.ok) throw new Error('Failed to create board');
       return response.json();
     } catch (error) {
-      console.error('Error creating board:', error);
       return this.createMockBoard(data);
     }
   },
@@ -45,7 +42,6 @@ export const boardApi = {
       const response = await fetch(`${API_BASE_URL}/${boardId}`, { method: 'DELETE' });
       return response.ok;
     } catch (error) {
-      console.error('Error deleting board:', error);
       return false;
     }
   },

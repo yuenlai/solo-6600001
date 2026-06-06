@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { CursorPosition, BoardElement, Layer, CanvasTransform } from '../types';
 
-const SERVER_URL = 'http://localhost:3001';
+const SERVER_URL = '/';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -9,7 +9,13 @@ class SocketService {
 
   connect(): Socket {
     if (!this.socket) {
-      this.socket = io(SERVER_URL, { autoConnect: false });
+      this.socket = io(SERVER_URL, {
+        autoConnect: false,
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 2000,
+        timeout: 10000,
+      });
     }
     this.socket.connect();
     return this.socket;
@@ -17,8 +23,11 @@ class SocketService {
 
   disconnect(): void {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
+      this.socket = null;
     }
+    this.boardId = null;
   }
 
   joinBoard(boardId: string, username: string): void {

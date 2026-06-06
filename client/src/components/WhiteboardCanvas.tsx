@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useWhiteboardStore } from '../store/whiteboard';
 import { socketService } from '../services/socket';
-import { BoardElement, ToolType } from '../types';
+import { BoardElement } from '../types';
 
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,7 +12,7 @@ export const WhiteboardCanvas: React.FC = () => {
 
   const {
     board, activeTool, strokeColor, fillColor, strokeWidth,
-    activeLayerIndex, canvasTransform, addElement, username
+    canvasTransform, addElement
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -120,7 +120,7 @@ export const WhiteboardCanvas: React.FC = () => {
     ctx.scale(canvasTransform.scale, canvasTransform.scale);
 
     if (board) {
-      board.layers.forEach((layer, layerIdx) => {
+      board.layers.forEach((layer) => {
         if (!layer.visible) return;
         layer.elements.forEach(el => {
           ctx.save();

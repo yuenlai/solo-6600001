@@ -12,14 +12,14 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const {
-    setBoard, updateCursor, removeCursor, setCursors, username, board
+    setBoard, updateCursor, removeCursor, setCursors, username
   } = useWhiteboardStore();
 
   useEffect(() => {
     if (currentView === 'board' && activeBoard) {
       setBoard(activeBoard);
 
-      const socket = socketService.connect();
+      socketService.connect();
       socketService.joinBoard(activeBoard._id, username);
 
       socketService.onUserJoined((data) => {

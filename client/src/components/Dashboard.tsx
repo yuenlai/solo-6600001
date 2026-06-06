@@ -266,8 +266,7 @@ const CreateBoardModal: React.FC<{
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
-  const [boards, setBoards] = useState<Board[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [boards, setBoards] = useState<Board[]>(boardApi.getMockBoards());
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const username = useWhiteboardStore((state) => state.username);
 
@@ -278,10 +277,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
   }, []);
 
   const loadBoards = async () => {
-    setLoading(true);
-    const data = await boardApi.getBoards(userId);
-    setBoards(data);
-    setLoading(false);
+    try {
+      const data = await boardApi.getBoards(userId);
+      setBoards(data);
+    } catch (error) {
+    }
   };
 
   const handleCreateBoard = async (name: string) => {
@@ -334,30 +334,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
   );
 
   const BoardGrid: React.FC<{ boards: Board[] }> = ({ boards: boardList }) => {
-    if (loading) {
-      return (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: '20px',
-          }}
-        >
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              style={{
-                background: '#f3f4f6',
-                borderRadius: '12px',
-                height: '180px',
-                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              }}
-            />
-          ))}
-        </div>
-      );
-    }
-
     if (boardList.length === 0) {
       return (
         <div
