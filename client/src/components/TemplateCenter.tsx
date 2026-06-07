@@ -140,11 +140,7 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
           position: 'relative',
         }}
       >
-        <span
-          style={{
-            fontSize: '48px',
-          }}
-        >
+        <span style={{ fontSize: '48px' }}>
           {template.icon}
         </span>
         {selected && (
@@ -383,6 +379,7 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
               {CATEGORIES.map((category) => (
                 <button
                   key={category.id}
+                  type="button"
                   onClick={() => setActiveCategory(category.id)}
                   style={{
                     padding: '8px 16px',
@@ -429,106 +426,106 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
                 >
                   <span>📄</span> 空白白板
                 </h3>
-              <div
-                onClick={() => setSelectedTemplate(null)}
-                style={{
-                  width: '220px',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  border: selectedTemplate === null ? '2px solid #667eea' : '2px solid transparent',
-                  boxShadow: selectedTemplate === null
-                    ? '0 8px 24px rgba(102, 126, 234, 0.25)'
-                    : '0 2px 8px rgba(0, 0, 0, 0.08)',
-                  transition: 'all 0.2s',
-                  background: '#fff',
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedTemplate !== null) {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedTemplate !== null) {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
-                  }
-                }}
-              >
                 <div
+                  onClick={() => setSelectedTemplate(null)}
                   style={{
-                    height: '140px',
-                    background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
+                    width: '220px',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    border: selectedTemplate === null ? '2px solid #667eea' : '2px solid transparent',
+                    boxShadow: selectedTemplate === null
+                      ? '0 8px 24px rgba(102, 126, 234, 0.25)'
+                      : '0 2px 8px rgba(0, 0, 0, 0.08)',
+                    transition: 'all 0.2s',
+                    background: '#fff',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedTemplate !== null) {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedTemplate !== null) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
+                    }
                   }}
                 >
-                  <svg
-                    width="48"
-                    height="48"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#9ca3af"
-                    strokeWidth="1.5"
-                  >
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <line x1="9" y1="9" x2="15" y2="9" />
-                    <line x1="9" y1="15" x2="15" y2="15" />
-                  </svg>
-                  {selectedTemplate === null && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: '#667eea',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="white"
-                        strokeWidth="3"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: '16px' }}>
-                  <h3
+                  <div
                     style={{
-                      margin: 0,
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      color: '#1a1a1a',
+                      height: '140px',
+                      background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
                     }}
                   >
-                    空白白板
-                  </h3>
-                  <p
-                  style={{
-                    margin: '4px 0 0',
-                    fontSize: '13px',
-                    color: '#6b7280',
-                  }}
-                >
-                  从零开始创建
-                </p>
+                    <svg
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#9ca3af"
+                      strokeWidth="1.5"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <line x1="9" y1="9" x2="15" y2="9" />
+                      <line x1="9" y1="15" x2="15" y2="15" />
+                    </svg>
+                    {selectedTemplate === null && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '12px',
+                          right: '12px',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: '#667eea',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="3"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: '16px' }}>
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        color: '#1a1a1a',
+                      }}
+                    >
+                      空白白板
+                    </h3>
+                    <p
+                      style={{
+                        margin: '4px 0 0',
+                        fontSize: '13px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      从零开始创建
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-            </div>
             )}
 
             <div>
