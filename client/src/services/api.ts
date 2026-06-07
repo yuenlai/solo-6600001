@@ -1,4 +1,4 @@
-import { Board, Template, SharePermission, ShareResult } from '../types';
+import { Board, Template, SharePermission, ShareResult, Comment, CommentReply } from '../types';
 
 const API_BASE_URL = '/api/boards';
 const TEMPLATE_API_URL = '/api/templates';
@@ -86,6 +86,63 @@ export const boardApi = {
     return response.ok;
   },
 
+  async getComments(boardId: string): Promise<Comment[]> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/comments`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch comments');
+    }
+    return response.json();
+  },
+
+  async addComment(boardId: string, comment: Omit<Comment, 'id' | 'createdAt' | 'replies' | 'resolved'>): Promise<Comment> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(comment),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to add comment');
+    }
+    return response.json();
+  },
+
+  async addReply(boardId: string, commentId: string, reply: Omit<CommentReply, 'id' | 'createdAt'>): Promise<CommentReply> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/comments/${commentId}/replies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reply),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to add reply');
+    }
+    return response.json();
+  },
+
+  async resolveComment(boardId: string, commentId: string, resolved: boolean): Promise<Comment> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/comments/${commentId}/resolve`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolved }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to resolve comment');
+    }
+    return response.json();
+  },
+
+  async deleteComment(boardId: string, commentId: string): Promise<boolean> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/comments/${commentId}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to delete comment');
+    }
+    return response.ok;
+  },
+
   getMockBoards(): Board[] {
     const now = new Date().toISOString();
     const yesterday = new Date(Date.now() - 86400000).toISOString();
@@ -99,6 +156,7 @@ export const boardApi = {
         ownerId: 'user-1',
         collaborators: ['user-2', 'user-3'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
+        comments: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#f5f5f5',
@@ -114,6 +172,7 @@ export const boardApi = {
         ownerId: 'user-1',
         collaborators: ['user-4'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
+        comments: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#ffffff',
@@ -129,6 +188,7 @@ export const boardApi = {
         ownerId: 'user-2',
         collaborators: ['user-1', 'user-5'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
+        comments: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#f0f8ff',
@@ -144,6 +204,7 @@ export const boardApi = {
         ownerId: 'user-3',
         collaborators: ['user-1'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
+        comments: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#fff8e1',
@@ -164,6 +225,7 @@ export const boardApi = {
       ownerId: data.ownerId,
       collaborators: [],
       layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
+      comments: [],
       width: 3000,
       height: 2000,
       backgroundColor: '#ffffff',
@@ -234,6 +296,7 @@ const createMockBoardFromTemplate = (
     ownerId: data.ownerId,
     collaborators: [],
     layers: template.layers || [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
+    comments: [],
     width: template.width,
     height: template.height,
     backgroundColor: template.backgroundColor,

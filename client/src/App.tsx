@@ -8,7 +8,7 @@ import { ShareModal } from './components/ShareModal';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
-import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType } from './types';
+import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType, Comment, CommentReply } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -16,8 +16,9 @@ const App: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [loadingSharedBoard, setLoadingSharedBoard] = useState(false);
   const {
-    setBoard, updateCursor, removeCursor, setCursors, username,
-    canEdit, setCanEdit, setIsShareAccess
+    board, setBoard, updateCursor, removeCursor, setCursors, username,
+    canEdit, setCanEdit, setIsShareAccess, showCommentPanel, setShowCommentPanel,
+    loadComments
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -52,6 +53,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (currentView === 'board' && activeBoard) {
       setBoard(activeBoard);
+      loadComments(activeBoard._id);
 
       socketService.connect();
       
@@ -100,6 +102,50 @@ const App: React.FC = () => {
       });
       socketService.onPermissionUpdate((data) => {
         setCanEdit(data.canEdit);
+      });
+      socketService.onCommentAdded((data: { comment: Comment }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const comments = [...(currentBoard.comments || []), data.comment];
+          setBoard({ ...currentBoard, comments });
+        }
+      });
+      socketService.onCommentUpdated((data: { commentId: string; updates: Partial<Comment> }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const comments = (currentBoard.comments || []).map(c =>
+            c.id === data.commentId ? { ...c, ...data.updates } : c
+          );
+          setBoard({ ...currentBoard, comments });
+        }
+      });
+      socketService.onReplyAdded((data: { commentId: string; reply: CommentReply }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const comments = (currentBoard.comments || []).map(c => {
+            if (c.id === data.commentId) {
+              return { ...c, replies: [...c.replies, data.reply] };
+            }
+            return c;
+          });
+          setBoard({ ...currentBoard, comments });
+        }
+      });
+      socketService.onCommentResolved((data: { commentId: string; resolved: boolean }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const comments = (currentBoard.comments || []).map(c =>
+            c.id === data.commentId ? { ...c, resolved: data.resolved } : c
+          );
+          setBoard({ ...currentBoard, comments });
+        }
+      });
+      socketService.onCommentDeleted((data: { commentId: string }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const comments = (currentBoard.comments || []).filter(c => c.id !== data.commentId);
+          setBoard({ ...currentBoard, comments });
+        }
       });
       socketService.onError((data) => {
         console.warn('Socket error:', data.message);
@@ -240,6 +286,52 @@ const App: React.FC = () => {
           )}
         </div>
         <div style={{ flex: 1 }} />
+        <button
+          onClick={() => setShowCommentPanel(!showCommentPanel)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: showCommentPanel ? '#fff' : '#374151',
+            background: showCommentPanel ? '#2196f3' : '#f3f4f6',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (!showCommentPanel) {
+              e.currentTarget.style.background = '#e5e7eb';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!showCommentPanel) {
+              e.currentTarget.style.background = '#f3f4f6';
+            }
+          }}
+        >
+          💬
+          评论
+          {(() => {
+            const unresolvedCount = board?.comments?.filter((c) => !c.resolved).length || 0;
+            return unresolvedCount > 0 ? (
+              <span style={{
+                background: '#f44336',
+                color: '#fff',
+                borderRadius: '10px',
+                padding: '0 6px',
+                fontSize: '11px',
+                minWidth: '18px',
+                textAlign: 'center'
+              }}>
+                {unresolvedCount}
+              </span>
+            ) : null;
+          })()}
+        </button>
         {!useWhiteboardStore.getState().isShareAccess && (
           <button
             onClick={() => setIsShareModalOpen(true)}

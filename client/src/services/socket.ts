@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { CursorPosition, BoardElement, Layer, CanvasTransform } from '../types';
+import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply } from '../types';
 
 const SERVER_URL = '/';
 
@@ -83,6 +83,36 @@ class SocketService {
     }
   }
 
+  addComment(comment: Comment): void {
+    if (this.boardId) {
+      this.socket?.emit('add-comment', { boardId: this.boardId, comment });
+    }
+  }
+
+  updateComment(commentId: string, updates: Partial<Comment>): void {
+    if (this.boardId) {
+      this.socket?.emit('update-comment', { boardId: this.boardId, commentId, updates });
+    }
+  }
+
+  addReply(commentId: string, reply: CommentReply): void {
+    if (this.boardId) {
+      this.socket?.emit('add-reply', { boardId: this.boardId, commentId, reply });
+    }
+  }
+
+  resolveComment(commentId: string, resolved: boolean): void {
+    if (this.boardId) {
+      this.socket?.emit('resolve-comment', { boardId: this.boardId, commentId, resolved });
+    }
+  }
+
+  deleteComment(commentId: string): void {
+    if (this.boardId) {
+      this.socket?.emit('delete-comment', { boardId: this.boardId, commentId });
+    }
+  }
+
   onUserJoined(callback: (data: { socketId: string; username: string }) => void): void {
     this.socket?.on('user-joined', callback);
   }
@@ -129,6 +159,26 @@ class SocketService {
 
   onPermissionUpdate(callback: (data: { canEdit: boolean }) => void): void {
     this.socket?.on('permission-update', callback);
+  }
+
+  onCommentAdded(callback: (data: { comment: Comment }) => void): void {
+    this.socket?.on('comment-added', callback);
+  }
+
+  onCommentUpdated(callback: (data: { commentId: string; updates: Partial<Comment> }) => void): void {
+    this.socket?.on('comment-updated', callback);
+  }
+
+  onReplyAdded(callback: (data: { commentId: string; reply: CommentReply }) => void): void {
+    this.socket?.on('reply-added', callback);
+  }
+
+  onCommentResolved(callback: (data: { commentId: string; resolved: boolean }) => void): void {
+    this.socket?.on('comment-resolved', callback);
+  }
+
+  onCommentDeleted(callback: (data: { commentId: string }) => void): void {
+    this.socket?.on('comment-deleted', callback);
   }
 
   onError(callback: (data: { message: string }) => void): void {

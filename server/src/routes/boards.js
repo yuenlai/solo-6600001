@@ -196,4 +196,132 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Get all comments for a board
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    res.json(board.comments || []);
+  } catch (err) {
+    console.error('[Boards] Error fetching comments:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add a new comment to a board
+router.post('/:id/comments', async (req, res) => {
+  try {
+    const { targetType, targetId, x, y, content, author, authorId } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const newComment = {
+      id: uuidv4(),
+      targetType: targetType || 'canvas',
+      targetId: targetId || null,
+      x: x || 0,
+      y: y || 0,
+      content,
+      author: author || 'Anonymous',
+      authorId: authorId || 'anonymous',
+      createdAt: new Date().toISOString(),
+      resolved: false,
+      replies: []
+    };
+    
+    const comments = board.comments || [];
+    comments.push(newComment);
+    
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { comments },
+      { new: true }
+    );
+    
+    console.log(`[Boards] Added comment to board ${req.params.id}`);
+    res.json(newComment);
+  } catch (err) {
+    console.error('[Boards] Error adding comment:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add a reply to a comment
+router.post('/:id/comments/:commentId/replies', async (req, res) => {
+  try {
+    const { content, author, authorId } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const comments = board.comments || [];
+    const commentIndex = comments.findIndex(c => c.id === req.params.commentId);
+    
+    if (commentIndex < 0) return res.status(404).json({ error: 'Comment not found' });
+    
+    const newReply = {
+      id: uuidv4(),
+      content,
+      author: author || 'Anonymous',
+      authorId: authorId || 'anonymous',
+      createdAt: new Date().toISOString()
+    };
+    
+    comments[commentIndex].replies.push(newReply);
+    
+    await Board.findByIdAndUpdate(req.params.id, { comments });
+    
+    console.log(`[Boards] Added reply to comment ${req.params.commentId}`);
+    res.json(newReply);
+  } catch (err) {
+    console.error('[Boards] Error adding reply:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Resolve a comment
+router.patch('/:id/comments/:commentId/resolve', async (req, res) => {
+  try {
+    const { resolved } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const comments = board.comments || [];
+    const commentIndex = comments.findIndex(c => c.id === req.params.commentId);
+    
+    if (commentIndex < 0) return res.status(404).json({ error: 'Comment not found' });
+    
+    comments[commentIndex].resolved = resolved !== undefined ? resolved : true;
+    
+    await Board.findByIdAndUpdate(req.params.id, { comments });
+    
+    console.log(`[Boards] Resolved comment ${req.params.commentId}`);
+    res.json(comments[commentIndex]);
+  } catch (err) {
+    console.error('[Boards] Error resolving comment:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a comment
+router.delete('/:id/comments/:commentId', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const comments = (board.comments || []).filter(c => c.id !== req.params.commentId);
+    
+    await Board.findByIdAndUpdate(req.params.id, { comments });
+    
+    console.log(`[Boards] Deleted comment ${req.params.commentId}`);
+    res.json({ message: 'Comment deleted' });
+  } catch (err) {
+    console.error('[Boards] Error deleting comment:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

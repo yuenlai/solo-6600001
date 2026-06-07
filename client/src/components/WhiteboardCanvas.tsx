@@ -1,8 +1,10 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useWhiteboardStore } from '../store/whiteboard';
 import { socketService } from '../services/socket';
-import { BoardElement } from '../types';
+import { BoardElement, Comment } from '../types';
+import { CommentPanel } from './CommentPanel';
+import { AddCommentModal } from './AddCommentModal';
 
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -10,9 +12,16 @@ export const WhiteboardCanvas: React.FC = () => {
   const currentPathRef = useRef<number[]>([]);
   const startPosRef = useRef({ x: 0, y: 0 });
 
+  const [addingComment, setAddingComment] = useState<{
+    position: { x: number; y: number };
+    targetType: 'element' | 'canvas';
+    targetId: string | null;
+  } | null>(null);
+
   const {
     board, activeTool, strokeColor, fillColor, strokeWidth,
-    canvasTransform, addElement, canEdit
+    canvasTransform, addElement, canEdit, showCommentPanel, setShowCommentPanel,
+    setSelectedCommentId
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -25,13 +34,61 @@ export const WhiteboardCanvas: React.FC = () => {
     };
   }, [canvasTransform]);
 
+  const findElementAtPoint = useCallback((x: number, y: number): BoardElement | null => {
+    if (!board) return null;
+    
+    for (let i = board.layers.length - 1; i >= 0; i--) {
+      const layer = board.layers[i];
+      if (!layer.visible) continue;
+      
+      for (let j = layer.elements.length - 1; j >= 0; j--) {
+        const el = layer.elements[j];
+        let hit = false;
+        
+        switch (el.type) {
+          case 'rect':
+          case 'sticky-note':
+            hit = x >= el.x && x <= el.x + (el.width || 0) &&
+                  y >= el.y && y <= el.y + (el.height || 0);
+            break;
+          case 'circle':
+            const rx = (el.width || 0) / 2;
+            const ry = (el.height || 0) / 2;
+            hit = Math.pow((x - el.x) / rx, 2) + Math.pow((y - el.y) / ry, 2) <= 1;
+            break;
+          case 'text':
+            hit = x >= el.x && x <= el.x + 100 && y >= el.y - 20 && y <= el.y;
+            break;
+          case 'path':
+          case 'line':
+            hit = false;
+            break;
+        }
+        
+        if (hit) return el;
+      }
+    }
+    return null;
+  }, [board]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canEdit) return;
     const point = getCanvasPoint(e);
+
+    if (activeTool === 'comment') {
+      const element = findElementAtPoint(point.x, point.y);
+      setAddingComment({
+        position: point,
+        targetType: element ? 'element' : 'canvas',
+        targetId: element?.id || null
+      });
+      return;
+    }
+
     isDrawingRef.current = true;
     startPosRef.current = point;
     currentPathRef.current = [point.x, point.y];
-  }, [canEdit, getCanvasPoint]);
+  }, [canEdit, getCanvasPoint, activeTool, findElementAtPoint]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasPoint(e);
@@ -104,6 +161,12 @@ export const WhiteboardCanvas: React.FC = () => {
     }
     currentPathRef.current = [];
   }, [activeTool, strokeColor, fillColor, strokeWidth, addElement, canEdit, getCanvasPoint]);
+
+  const handleCommentMarkerClick = (comment: Comment, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedCommentId(comment.id);
+    setShowCommentPanel(true);
+  };
 
   // Render canvas
   useEffect(() => {
@@ -206,19 +269,67 @@ export const WhiteboardCanvas: React.FC = () => {
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, []);
 
+  const comments = board?.comments || [];
+
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        width: '100%',
-        height: '100%',
-        cursor: !canEdit ? 'default' : activeTool === 'select' ? 'default' : 'crosshair',
-        backgroundColor: board?.backgroundColor || '#f5f5f5'
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={() => { isDrawingRef.current = false; }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          cursor: !canEdit ? 'default' : activeTool === 'select' ? 'default' : activeTool === 'comment' ? 'pointer' : 'crosshair',
+          backgroundColor: board?.backgroundColor || '#f5f5f5'
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => { isDrawingRef.current = false; }}
+      />
+      
+      {comments.map((comment) => (
+        <div
+          key={comment.id}
+          onClick={(e) => handleCommentMarkerClick(comment, e)}
+          style={{
+            position: 'absolute',
+            left: comment.x * canvasTransform.scale + canvasTransform.translateX - 12,
+            top: comment.y * canvasTransform.scale + canvasTransform.translateY - 12,
+            width: '24px',
+            height: '24px',
+            background: comment.resolved ? '#4caf50' : '#f44336',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontSize: '12px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+            zIndex: 100,
+            transition: 'transform 0.15s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          💬
+        </div>
+      ))}
+
+      {showCommentPanel && <CommentPanel />}
+
+      {addingComment && (
+        <AddCommentModal
+          position={addingComment.position}
+          targetType={addingComment.targetType}
+          targetId={addingComment.targetId}
+          onClose={() => setAddingComment(null)}
+        />
+      )}
+    </div>
   );
 };

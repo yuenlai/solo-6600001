@@ -115,6 +115,26 @@ function setupSocketHandlers(io) {
       socket.to(`board:${boardId}`).emit('canvas-transformed', { transform });
     });
 
+    socket.on('add-comment', ({ boardId, comment }) => {
+      socket.to(`board:${boardId}`).emit('comment-added', { comment });
+    });
+
+    socket.on('update-comment', ({ boardId, commentId, updates }) => {
+      socket.to(`board:${boardId}`).emit('comment-updated', { commentId, updates });
+    });
+
+    socket.on('add-reply', ({ boardId, commentId, reply }) => {
+      socket.to(`board:${boardId}`).emit('reply-added', { commentId, reply });
+    });
+
+    socket.on('resolve-comment', ({ boardId, commentId, resolved }) => {
+      socket.to(`board:${boardId}`).emit('comment-resolved', { commentId, resolved });
+    });
+
+    socket.on('delete-comment', ({ boardId, commentId }) => {
+      socket.to(`board:${boardId}`).emit('comment-deleted', { commentId });
+    });
+
     socket.on('disconnect', () => {
       const pos = cursorPositions.get(socket.id);
       if (pos) {

@@ -42,6 +42,7 @@ class LocalBoard {
     this.ownerId = data.ownerId;
     this.collaborators = data.collaborators || [];
     this.layers = data.layers || [{ name: 'Layer 1', visible: true, locked: false, order: 0, elements: [] }];
+    this.comments = data.comments || [];
     this.width = data.width || 3000;
     this.height = data.height || 2000;
     this.backgroundColor = data.backgroundColor || '#ffffff';
@@ -59,6 +60,7 @@ class LocalBoard {
       ownerId: this.ownerId,
       collaborators: this.collaborators,
       layers: this.layers,
+      comments: this.comments,
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor,

@@ -11,6 +11,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
   { type: 'text', label: '文本', icon: '🔤' },
   { type: 'sticky-note', label: '便签', icon: '📝' },
   { type: 'eraser', label: '橡皮', icon: '🧹' },
+  { type: 'comment', label: '评论', icon: '💬' },
 ];
 
 export const Toolbar: React.FC = () => {

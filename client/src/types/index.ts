@@ -37,6 +37,7 @@ export interface Board {
   ownerId: string;
   collaborators: string[];
   layers: Layer[];
+  comments: Comment[];
   width: number;
   height: number;
   backgroundColor: string;
@@ -69,7 +70,29 @@ export interface CanvasTransform {
   translateY: number;
 }
 
-export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'eraser';
+export interface CommentReply {
+  id: string;
+  content: string;
+  author: string;
+  authorId: string;
+  createdAt: string;
+}
+
+export interface Comment {
+  id: string;
+  targetType: 'element' | 'canvas';
+  targetId: string | null;
+  x: number;
+  y: number;
+  content: string;
+  author: string;
+  authorId: string;
+  createdAt: string;
+  resolved: boolean;
+  replies: CommentReply[];
+}
+
+export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'eraser' | 'comment';
 
 export interface Template {
   _id: string;

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply } from '../types';
 import { socketService } from '../services/socket';
+import { boardApi } from '../services/api';
 
 interface WhiteboardState {
   board: Board | null;
@@ -14,6 +15,8 @@ interface WhiteboardState {
   username: string;
   canEdit: boolean;
   isShareAccess: boolean;
+  selectedCommentId: string | null;
+  showCommentPanel: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -35,6 +38,15 @@ interface WhiteboardState {
   setUsername: (name: string) => void;
   setCanEdit: (canEdit: boolean) => void;
   setIsShareAccess: (isShare: boolean) => void;
+  addComment: (comment: Omit<Comment, 'id' | 'createdAt' | 'replies' | 'resolved'>) => Promise<Comment | null>;
+  addReplyToComment: (commentId: string, reply: Omit<CommentReply, 'id' | 'createdAt'>) => Promise<CommentReply | null>;
+  updateComment: (commentId: string, updates: Partial<Comment>) => void;
+  resolveComment: (commentId: string, resolved: boolean) => Promise<boolean>;
+  deleteComment: (commentId: string) => Promise<boolean>;
+  loadComments: (boardId: string) => Promise<void>;
+  setComments: (comments: Comment[]) => void;
+  setSelectedCommentId: (id: string | null) => void;
+  setShowCommentPanel: (show: boolean) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -49,6 +61,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   username: `User_${Math.random().toString(36).substr(2, 6)}`,
   canEdit: true,
   isShareAccess: false,
+  selectedCommentId: null,
+  showCommentPanel: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -144,4 +158,124 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setUsername: (name) => set({ username: name }),
   setCanEdit: (canEdit) => set({ canEdit }),
   setIsShareAccess: (isShareAccess) => set({ isShareAccess }),
+
+  addComment: async (commentData) => {
+    const { board } = get();
+    if (!board) return null;
+    
+    try {
+      const savedComment = await boardApi.addComment(board._id, commentData);
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const comments = [...(currentBoard.comments || []), savedComment];
+        set({ board: { ...currentBoard, comments } });
+        socketService.addComment(savedComment);
+      }
+      return savedComment;
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+      return null;
+    }
+  },
+
+  addReplyToComment: async (commentId, replyData) => {
+    const { board } = get();
+    if (!board) return null;
+    
+    try {
+      const savedReply = await boardApi.addReply(board._id, commentId, replyData);
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const comments = (currentBoard.comments || []).map(c => {
+          if (c.id === commentId) {
+            return { ...c, replies: [...c.replies, savedReply] };
+          }
+          return c;
+        });
+        set({ board: { ...currentBoard, comments } });
+        socketService.addReply(commentId, savedReply);
+      }
+      return savedReply;
+    } catch (err) {
+      console.error('Failed to add reply:', err);
+      return null;
+    }
+  },
+
+  updateComment: (commentId, updates) => {
+    const { board } = get();
+    if (!board) return;
+    const comments = (board.comments || []).map(c => {
+      if (c.id === commentId) {
+        return { ...c, ...updates };
+      }
+      return c;
+    });
+    set({ board: { ...board, comments } });
+    socketService.updateComment(commentId, updates);
+  },
+
+  resolveComment: async (commentId, resolved) => {
+    const { board } = get();
+    if (!board) return false;
+    
+    try {
+      const updatedComment = await boardApi.resolveComment(board._id, commentId, resolved);
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const comments = (currentBoard.comments || []).map(c => {
+          if (c.id === commentId) {
+            return updatedComment;
+          }
+          return c;
+        });
+        set({ board: { ...currentBoard, comments } });
+        socketService.resolveComment(commentId, resolved);
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to resolve comment:', err);
+      return false;
+    }
+  },
+
+  deleteComment: async (commentId) => {
+    const { board } = get();
+    if (!board) return false;
+    
+    try {
+      await boardApi.deleteComment(board._id, commentId);
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const comments = (currentBoard.comments || []).filter(c => c.id !== commentId);
+        set({ board: { ...currentBoard, comments }, selectedCommentId: null });
+        socketService.deleteComment(commentId);
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      return false;
+    }
+  },
+
+  loadComments: async (boardId: string) => {
+    try {
+      const comments = await boardApi.getComments(boardId);
+      const { board } = get();
+      if (board && board._id === boardId) {
+        set({ board: { ...board, comments } });
+      }
+    } catch (err) {
+      console.error('Failed to load comments:', err);
+    }
+  },
+
+  setComments: (comments: Comment[]) => {
+    const { board } = get();
+    if (!board) return;
+    set({ board: { ...board, comments } });
+  },
+
+  setSelectedCommentId: (id) => set({ selectedCommentId: id }),
+  setShowCommentPanel: (show) => set({ showCommentPanel: show }),
 }));
