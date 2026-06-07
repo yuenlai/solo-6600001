@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { Board } = require('../storage');
+const { v4: uuidv4 } = require('uuid');
+const { Board, readBoards } = require('../storage');
 
 // Get all boards for a user
 router.get('/', async (req, res) => {
@@ -16,6 +17,24 @@ router.get('/', async (req, res) => {
     res.json(boards);
   } catch (err) {
     console.error('[Boards] Error fetching boards:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get a board by share token
+router.get('/share/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const boards = readBoards();
+    const board = boards.find((b) => b.shareToken === token && b.isShared);
+    
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found or share link expired' });
+    }
+    
+    res.json(board);
+  } catch (err) {
+    console.error('[Boards] Error fetching shared board:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -66,6 +85,91 @@ router.post('/', async (req, res) => {
     res.status(201).json(savedBoard);
   } catch (err) {
     console.error('[Boards] Error creating board:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate or update share link for a board
+router.post('/:id/share', async (req, res) => {
+  try {
+    const { permission = 'view' } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
+    }
+
+    const shareToken = board.shareToken || uuidv4();
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      {
+        isShared: true,
+        shareToken,
+        sharePermission: permission
+      },
+      { new: true }
+    );
+
+    console.log(`[Boards] Shared board ${req.params.id} with permission: ${permission}`);
+    res.json({
+      shareToken,
+      shareUrl: `${req.protocol}://${req.get('host')}/share/${shareToken}`,
+      permission,
+      board: updatedBoard
+    });
+  } catch (err) {
+    console.error('[Boards] Error sharing board:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update share permission
+router.put('/:id/share', async (req, res) => {
+  try {
+    const { permission } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
+    }
+
+    if (!board.isShared || !board.shareToken) {
+      return res.status(400).json({ error: 'Board is not shared yet' });
+    }
+
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { sharePermission: permission },
+      { new: true }
+    );
+
+    console.log(`[Boards] Updated share permission for board ${req.params.id}: ${permission}`);
+    res.json(updatedBoard);
+  } catch (err) {
+    console.error('[Boards] Error updating share permission:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Revoke share link
+router.delete('/:id/share', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
+    }
+
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { isShared: false, shareToken: null },
+      { new: true }
+    );
+
+    console.log(`[Boards] Revoked share for board ${req.params.id}`);
+    res.json({ message: 'Share revoked', board: updatedBoard });
+  } catch (err) {
+    console.error('[Boards] Error revoking share:', err);
     res.status(500).json({ error: err.message });
   }
 });

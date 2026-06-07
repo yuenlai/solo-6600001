@@ -12,7 +12,7 @@ export const WhiteboardCanvas: React.FC = () => {
 
   const {
     board, activeTool, strokeColor, fillColor, strokeWidth,
-    canvasTransform, addElement
+    canvasTransform, addElement, canEdit
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -26,22 +26,23 @@ export const WhiteboardCanvas: React.FC = () => {
   }, [canvasTransform]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canEdit) return;
     const point = getCanvasPoint(e);
     isDrawingRef.current = true;
     startPosRef.current = point;
     currentPathRef.current = [point.x, point.y];
-  }, [getCanvasPoint]);
+  }, [canEdit, getCanvasPoint]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasPoint(e);
     socketService.moveCursor(point.x, point.y);
 
-    if (!isDrawingRef.current) return;
+    if (!isDrawingRef.current || !canEdit) return;
     currentPathRef.current.push(point.x, point.y);
-  }, [getCanvasPoint]);
+  }, [canEdit, getCanvasPoint]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
+    if (!isDrawingRef.current || !canEdit) return;
     isDrawingRef.current = false;
     const point = getCanvasPoint(e);
     let element: BoardElement | null = null;
@@ -102,7 +103,7 @@ export const WhiteboardCanvas: React.FC = () => {
       addElement(element);
     }
     currentPathRef.current = [];
-  }, [activeTool, strokeColor, fillColor, strokeWidth, addElement, getCanvasPoint]);
+  }, [activeTool, strokeColor, fillColor, strokeWidth, addElement, canEdit, getCanvasPoint]);
 
   // Render canvas
   useEffect(() => {
@@ -211,7 +212,7 @@ export const WhiteboardCanvas: React.FC = () => {
       style={{
         width: '100%',
         height: '100%',
-        cursor: activeTool === 'select' ? 'default' : 'crosshair',
+        cursor: !canEdit ? 'default' : activeTool === 'select' ? 'default' : 'crosshair',
         backgroundColor: board?.backgroundColor || '#f5f5f5'
       }}
       onMouseDown={handleMouseDown}

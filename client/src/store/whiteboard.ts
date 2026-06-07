@@ -12,6 +12,8 @@ interface WhiteboardState {
   cursors: Map<string, CursorPosition>;
   canvasTransform: CanvasTransform;
   username: string;
+  canEdit: boolean;
+  isShareAccess: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -31,6 +33,8 @@ interface WhiteboardState {
   removeCursor: (socketId: string) => void;
   setCursors: (cursors: CursorPosition[]) => void;
   setUsername: (name: string) => void;
+  setCanEdit: (canEdit: boolean) => void;
+  setIsShareAccess: (isShare: boolean) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -43,6 +47,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   cursors: new Map(),
   canvasTransform: { scale: 1, translateX: 0, translateY: 0 },
   username: `User_${Math.random().toString(36).substr(2, 6)}`,
+  canEdit: true,
+  isShareAccess: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -52,8 +58,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setActiveLayerIndex: (index) => set({ activeLayerIndex: index }),
 
   addElement: (element) => {
-    const { board, activeLayerIndex } = get();
-    if (!board) return;
+    const { board, activeLayerIndex, canEdit } = get();
+    if (!board || !canEdit) return;
     const layers = [...board.layers];
     layers[activeLayerIndex] = {
       ...layers[activeLayerIndex],
@@ -64,8 +70,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   updateElement: (elementId, updates) => {
-    const { board, activeLayerIndex } = get();
-    if (!board) return;
+    const { board, activeLayerIndex, canEdit } = get();
+    if (!board || !canEdit) return;
     const layers = [...board.layers];
     const elements = layers[activeLayerIndex].elements.map(el =>
       el.id === elementId ? { ...el, ...updates } : el
@@ -76,8 +82,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   deleteElement: (elementId) => {
-    const { board, activeLayerIndex } = get();
-    if (!board) return;
+    const { board, activeLayerIndex, canEdit } = get();
+    if (!board || !canEdit) return;
     const layers = [...board.layers];
     const elements = layers[activeLayerIndex].elements.filter(el => el.id !== elementId);
     layers[activeLayerIndex] = { ...layers[activeLayerIndex], elements };
@@ -86,8 +92,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   addLayer: (name) => {
-    const { board } = get();
-    if (!board) return;
+    const { board, canEdit } = get();
+    if (!board || !canEdit) return;
     const newLayer: Layer = { name, visible: true, locked: false, order: board.layers.length, elements: [] };
     const layers = [...board.layers, newLayer];
     set({ board: { ...board, layers }, activeLayerIndex: layers.length - 1 });
@@ -104,8 +110,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   toggleLayerLock: (index) => {
-    const { board } = get();
-    if (!board) return;
+    const { board, canEdit } = get();
+    if (!board || !canEdit) return;
     const layers = [...board.layers];
     layers[index] = { ...layers[index], locked: !layers[index].locked };
     set({ board: { ...board, layers } });
@@ -136,4 +142,6 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   setUsername: (name) => set({ username: name }),
+  setCanEdit: (canEdit) => set({ canEdit }),
+  setIsShareAccess: (isShareAccess) => set({ isShareAccess }),
 }));

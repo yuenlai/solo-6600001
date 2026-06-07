@@ -47,6 +47,9 @@ class LocalBoard {
     this.backgroundColor = data.backgroundColor || '#ffffff';
     this.createdAt = data.createdAt || new Date().toISOString();
     this.updatedAt = data.updatedAt || new Date().toISOString();
+    this.isShared = data.isShared || false;
+    this.shareToken = data.shareToken || null;
+    this.sharePermission = data.sharePermission || 'view';
   }
 
   toObject() {
@@ -61,6 +64,9 @@ class LocalBoard {
       backgroundColor: this.backgroundColor,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
+      isShared: this.isShared,
+      shareToken: this.shareToken,
+      sharePermission: this.sharePermission,
     };
   }
 
@@ -165,4 +171,5 @@ const initStorage = () => {
 module.exports = {
   Board: LocalBoard,
   initStorage,
+  readBoards,
 };

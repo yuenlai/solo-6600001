@@ -15,7 +15,10 @@ const boardSchema = new mongoose.Schema({
   layers: [layerSchema],
   width: { type: Number, default: 3000 },
   height: { type: Number, default: 2000 },
-  backgroundColor: { type: String, default: '#ffffff' }
+  backgroundColor: { type: String, default: '#ffffff' },
+  isShared: { type: Boolean, default: false },
+  shareToken: { type: String, default: null },
+  sharePermission: { type: String, default: 'view', enum: ['view', 'edit'] }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Board', boardSchema);

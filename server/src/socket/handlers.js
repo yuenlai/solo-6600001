@@ -1,13 +1,26 @@
 const { v4: uuidv4 } = require('uuid');
+const { readBoards } = require('../storage');
 
 const activeUsers = new Map(); // boardId -> Set of socket ids
-const cursorPositions = new Map(); // socketId -> { x, y, username, boardId }
+const cursorPositions = new Map(); // socketId -> { x, y, username, boardId, canEdit }
+
+const canUserEdit = (board, userId, isShareAccess) => {
+  if (!board) return false;
+  if (board.ownerId === userId) return true;
+  if (board.collaborators && board.collaborators.includes(userId)) return true;
+  if (isShareAccess && board.isShared && board.sharePermission === 'edit') return true;
+  return false;
+};
 
 function setupSocketHandlers(io) {
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.on('join-board', ({ boardId, username }) => {
+    socket.on('join-board', ({ boardId, username, userId, isShareAccess = false }) => {
+      const boards = readBoards();
+      const board = boards.find((b) => b._id === boardId);
+      const canEdit = canUserEdit(board, userId, isShareAccess);
+
       socket.join(`board:${boardId}`);
       
       if (!activeUsers.has(boardId)) {
@@ -15,19 +28,20 @@ function setupSocketHandlers(io) {
       }
       activeUsers.get(boardId).add(socket.id);
       
-      cursorPositions.set(socket.id, { x: 0, y: 0, username, boardId });
+      cursorPositions.set(socket.id, { x: 0, y: 0, username, boardId, canEdit });
       
       // Notify others in the room
-      socket.to(`board:${boardId}`).emit('user-joined', { socketId: socket.id, username });
+      socket.to(`board:${boardId}`).emit('user-joined', { socketId: socket.id, username, canEdit });
       
       // Send current active users to the joiner
       const users = [];
       for (const [sid, data] of cursorPositions) {
         if (data.boardId === boardId && sid !== socket.id) {
-          users.push({ socketId: sid, username: data.username, x: data.x, y: data.y });
+          users.push({ socketId: sid, username: data.username, x: data.x, y: data.y, canEdit: data.canEdit });
         }
       }
       socket.emit('active-users', users);
+      socket.emit('permission-update', { canEdit });
     });
 
     socket.on('cursor-move', ({ boardId, x, y }) => {
@@ -44,26 +58,56 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('draw-element', ({ boardId, element, layerIndex }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) {
+        socket.emit('error', { message: 'You do not have permission to edit this board' });
+        return;
+      }
       socket.to(`board:${boardId}`).emit('element-added', { element, layerIndex });
     });
 
     socket.on('update-element', ({ boardId, elementId, updates, layerIndex }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) {
+        socket.emit('error', { message: 'You do not have permission to edit this board' });
+        return;
+      }
       socket.to(`board:${boardId}`).emit('element-updated', { elementId, updates, layerIndex });
     });
 
     socket.on('delete-element', ({ boardId, elementId, layerIndex }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) {
+        socket.emit('error', { message: 'You do not have permission to edit this board' });
+        return;
+      }
       socket.to(`board:${boardId}`).emit('element-deleted', { elementId, layerIndex });
     });
 
     socket.on('add-sticky-note', ({ boardId, note, layerIndex }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) {
+        socket.emit('error', { message: 'You do not have permission to edit this board' });
+        return;
+      }
       socket.to(`board:${boardId}`).emit('sticky-note-added', { note, layerIndex });
     });
 
     socket.on('add-shape', ({ boardId, shape, layerIndex }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) {
+        socket.emit('error', { message: 'You do not have permission to edit this board' });
+        return;
+      }
       socket.to(`board:${boardId}`).emit('shape-added', { shape, layerIndex });
     });
 
     socket.on('layer-update', ({ boardId, layers }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) {
+        socket.emit('error', { message: 'You do not have permission to edit this board' });
+        return;
+      }
       socket.to(`board:${boardId}`).emit('layers-updated', { layers });
     });
 

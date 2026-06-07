@@ -4,23 +4,67 @@ import { Toolbar } from './components/Toolbar';
 import { LayerPanel } from './components/LayerPanel';
 import { CursorOverlay } from './components/CursorOverlay';
 import { Dashboard } from './components/Dashboard';
+import { ShareModal } from './components/ShareModal';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
+import { boardApi } from './services/api';
 import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [loadingSharedBoard, setLoadingSharedBoard] = useState(false);
   const {
-    setBoard, updateCursor, removeCursor, setCursors, username
+    setBoard, updateCursor, removeCursor, setCursors, username,
+    canEdit, setCanEdit, setIsShareAccess
   } = useWhiteboardStore();
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/share/')) {
+      const token = path.replace('/share/', '');
+      loadSharedBoard(token);
+    }
+  }, []);
+
+  const loadSharedBoard = async (token: string) => {
+    try {
+      setLoadingSharedBoard(true);
+      const board = await boardApi.getSharedBoard(token);
+      if (board) {
+        setActiveBoard(board);
+        setCurrentView('board');
+        setIsShareAccess(true);
+        setCanEdit(board.sharePermission === 'edit');
+        window.history.replaceState({}, '', '/');
+      } else {
+        alert('该分享链接不存在或已失效');
+      }
+    } catch (error) {
+      console.error('Failed to load shared board:', error);
+      alert('加载分享白板失败');
+    } finally {
+      setLoadingSharedBoard(false);
+    }
+  };
 
   useEffect(() => {
     if (currentView === 'board' && activeBoard) {
       setBoard(activeBoard);
 
       socketService.connect();
-      socketService.joinBoard(activeBoard._id, username);
+      
+      const userId = useWhiteboardStore.getState().isShareAccess
+        ? `guest_${Math.random().toString(36).substr(2, 6)}`
+        : 'user-1';
+      
+      socketService.joinBoard(
+        activeBoard._id, 
+        username, 
+        userId,
+        useWhiteboardStore.getState().isShareAccess
+      );
 
       socketService.onUserJoined((data) => {
         console.log(`${data.username} 加入了白板`);
@@ -54,6 +98,12 @@ const App: React.FC = () => {
       socketService.onCanvasTransformed((data: { transform: CanvasTransform }) => {
         useWhiteboardStore.getState().setCanvasTransform(data.transform);
       });
+      socketService.onPermissionUpdate((data) => {
+        setCanEdit(data.canEdit);
+      });
+      socketService.onError((data) => {
+        console.warn('Socket error:', data.message);
+      });
 
       return () => {
         socketService.disconnect();
@@ -64,15 +114,68 @@ const App: React.FC = () => {
   const handleBoardSelect = (boardItem: Board) => {
     setActiveBoard(boardItem);
     setCurrentView('board');
+    setCanEdit(true);
+    setIsShareAccess(false);
   };
 
   const handleBackToDashboard = () => {
     setCurrentView('dashboard');
     setActiveBoard(null);
+    setCanEdit(true);
+    setIsShareAccess(false);
   };
 
+  const handleBoardUpdate = (updatedBoard: Board) => {
+    setActiveBoard(updatedBoard);
+    setBoard(updatedBoard);
+  };
+
+  if (loadingSharedBoard) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: '#f9fafb',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#667eea"
+            strokeWidth="2"
+            style={{ animation: 'spin 1s linear infinite' }}
+          >
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+            <path d="M4 12a8 8 0 018-8" />
+          </svg>
+          <p style={{ marginTop: '16px', color: '#6b7280', fontSize: '14px' }}>正在加载分享白板...</p>
+        </div>
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   if (currentView === 'dashboard') {
-    return <Dashboard onBoardSelect={handleBoardSelect} />;
+    return (
+      <>
+        <Dashboard onBoardSelect={handleBoardSelect} />
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          board={activeBoard}
+          onBoardUpdate={handleBoardUpdate}
+        />
+      </>
+    );
   }
 
   return (
@@ -118,18 +221,74 @@ const App: React.FC = () => {
           fontSize: '14px',
           fontWeight: 600,
           color: '#1a1a1a',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
         }}>
           {activeBoard?.name}
+          {!canEdit && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: '#6b7280',
+              background: '#f3f4f6',
+              padding: '2px 8px',
+              borderRadius: '10px',
+            }}>
+              只读模式
+            </span>
+          )}
         </div>
+        <div style={{ flex: 1 }} />
+        {!useWhiteboardStore.getState().isShareAccess && (
+          <button
+            onClick={() => setIsShareModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: '#fff',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'opacity 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            分享
+          </button>
+        )}
       </div>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Toolbar />
+        {canEdit && <Toolbar />}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <WhiteboardCanvas />
           <CursorOverlay />
         </div>
-        <LayerPanel />
+        {canEdit && <LayerPanel />}
       </div>
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        board={activeBoard}
+        onBoardUpdate={handleBoardUpdate}
+      />
     </div>
   );
 };

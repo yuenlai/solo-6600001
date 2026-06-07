@@ -1,4 +1,4 @@
-import { Board, Template } from '../types';
+import { Board, Template, SharePermission, ShareResult } from '../types';
 
 const API_BASE_URL = '/api/boards';
 const TEMPLATE_API_URL = '/api/templates';
@@ -23,6 +23,16 @@ export const boardApi = {
     return response.json();
   },
 
+  async getSharedBoard(token: string): Promise<Board | null> {
+    const response = await fetch(`${API_BASE_URL}/share/${token}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch shared board');
+    }
+    return response.json();
+  },
+
   async createBoard(data: { name: string; ownerId: string; width?: number; height?: number }): Promise<Board | null> {
     const response = await fetch(API_BASE_URL, {
       method: 'POST',
@@ -38,6 +48,41 @@ export const boardApi = {
 
   async deleteBoard(boardId: string): Promise<boolean> {
     const response = await fetch(`${API_BASE_URL}/${boardId}`, { method: 'DELETE' });
+    return response.ok;
+  },
+
+  async shareBoard(boardId: string, permission: SharePermission = 'view'): Promise<ShareResult> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ permission }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to share board');
+    }
+    return response.json();
+  },
+
+  async updateSharePermission(boardId: string, permission: SharePermission): Promise<Board> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/share`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ permission }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to update share permission');
+    }
+    return response.json();
+  },
+
+  async revokeShare(boardId: string): Promise<boolean> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/share`, { method: 'DELETE' });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to revoke share');
+    }
     return response.ok;
   },
 
@@ -59,6 +104,9 @@ export const boardApi = {
         backgroundColor: '#f5f5f5',
         createdAt: lastWeek,
         updatedAt: now,
+        isShared: true,
+        shareToken: 'mock-token-1',
+        sharePermission: 'edit',
       },
       {
         _id: 'board-2',
@@ -71,6 +119,9 @@ export const boardApi = {
         backgroundColor: '#ffffff',
         createdAt: lastWeek,
         updatedAt: yesterday,
+        isShared: false,
+        shareToken: null,
+        sharePermission: 'view',
       },
       {
         _id: 'board-3',
@@ -83,6 +134,9 @@ export const boardApi = {
         backgroundColor: '#f0f8ff',
         createdAt: lastWeek,
         updatedAt: twoDaysAgo,
+        isShared: true,
+        shareToken: 'mock-token-3',
+        sharePermission: 'view',
       },
       {
         _id: 'board-4',
@@ -95,6 +149,9 @@ export const boardApi = {
         backgroundColor: '#fff8e1',
         createdAt: lastWeek,
         updatedAt: lastWeek,
+        isShared: false,
+        shareToken: null,
+        sharePermission: 'view',
       },
     ];
   },
@@ -112,6 +169,9 @@ export const boardApi = {
       backgroundColor: '#ffffff',
       createdAt: now,
       updatedAt: now,
+      isShared: false,
+      shareToken: null,
+      sharePermission: 'view',
     };
   },
 };
@@ -179,6 +239,9 @@ const createMockBoardFromTemplate = (
     backgroundColor: template.backgroundColor,
     createdAt: now,
     updatedAt: now,
+    isShared: false,
+    shareToken: null,
+    sharePermission: 'view',
   };
 };
 

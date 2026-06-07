@@ -30,9 +30,9 @@ class SocketService {
     this.boardId = null;
   }
 
-  joinBoard(boardId: string, username: string): void {
+  joinBoard(boardId: string, username: string, userId: string = 'anonymous', isShareAccess: boolean = false): void {
     this.boardId = boardId;
-    this.socket?.emit('join-board', { boardId, username });
+    this.socket?.emit('join-board', { boardId, username, userId, isShareAccess });
   }
 
   moveCursor(x: number, y: number): void {
@@ -125,6 +125,14 @@ class SocketService {
 
   onCanvasTransformed(callback: (data: { transform: CanvasTransform }) => void): void {
     this.socket?.on('canvas-transformed', callback);
+  }
+
+  onPermissionUpdate(callback: (data: { canEdit: boolean }) => void): void {
+    this.socket?.on('permission-update', callback);
+  }
+
+  onError(callback: (data: { message: string }) => void): void {
+    this.socket?.on('error', callback);
   }
 
   off(event: string, callback?: (...args: unknown[]) => void): void {

@@ -29,6 +29,8 @@ export interface Layer {
   elements: BoardElement[];
 }
 
+export type SharePermission = 'view' | 'edit';
+
 export interface Board {
   _id: string;
   name: string;
@@ -40,6 +42,16 @@ export interface Board {
   backgroundColor: string;
   createdAt: string;
   updatedAt: string;
+  isShared?: boolean;
+  shareToken?: string | null;
+  sharePermission?: SharePermission;
+}
+
+export interface ShareResult {
+  shareToken: string;
+  shareUrl: string;
+  permission: SharePermission;
+  board: Board;
 }
 
 export type ViewType = 'dashboard' | 'board';
