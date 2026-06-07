@@ -11,6 +11,7 @@ import { SnapshotHistoryPanel } from './components/SnapshotHistoryPanel';
 import { SearchPanel } from './components/SearchPanel';
 import { NotificationPanel } from './components/NotificationPanel';
 import { AssetPanel } from './components/AssetPanel';
+import { Minimap } from './components/Minimap';
 import { TeamSpace } from './components/TeamSpace';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
@@ -590,6 +591,7 @@ const App: React.FC = () => {
           <SnapshotHistoryPanel />
           <SearchPanel />
           <AssetPanel />
+          <Minimap />
         </div>
         {canEdit && <LayerPanel />}
       </div>

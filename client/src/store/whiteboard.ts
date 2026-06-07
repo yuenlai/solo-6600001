@@ -54,6 +54,7 @@ interface WhiteboardState {
   showNotificationPanel: boolean;
   assets: Asset[];
   showAssetPanel: boolean;
+  showMinimap: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -156,6 +157,7 @@ interface WhiteboardState {
   markAllNotificationsAsRead: (userId: string) => Promise<void>;
   deleteNotification: (notificationId: string) => Promise<void>;
   setShowAssetPanel: (show: boolean) => void;
+  setShowMinimap: (show: boolean) => void;
   setAssets: (assets: Asset[]) => void;
   addAsset: (asset: Omit<Asset, 'id' | 'createdAt' | 'usageCount'>) => void;
   deleteAsset: (assetId: string) => void;
@@ -216,6 +218,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showNotificationPanel: false,
   assets: [],
   showAssetPanel: false,
+  showMinimap: true,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -1110,6 +1113,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   setShowAssetPanel: (show) => set({ showAssetPanel: show }),
+
+  setShowMinimap: (show) => set({ showMinimap: show }),
 
   setAssets: (assets) => {
     set({ assets });
