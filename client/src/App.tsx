@@ -21,7 +21,8 @@ const App: React.FC = () => {
   const {
     board, setBoard, updateCursor, removeCursor, setCursors, username,
     canEdit, setCanEdit, setIsShareAccess, showCommentPanel, setShowCommentPanel,
-    loadComments
+    loadComments, setHostInfo, applyHostView, stopFollowingHost,
+    isHost, followState
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -220,6 +221,18 @@ const App: React.FC = () => {
           setBoard({ ...currentBoard, layers: data.layers });
         }
       });
+      socketService.onHostUpdated((hostInfo) => {
+        setHostInfo(hostInfo);
+        if (!hostInfo) {
+          const { followState } = useWhiteboardStore.getState();
+          if (followState.isFollowing) {
+            stopFollowingHost();
+          }
+        }
+      });
+      socketService.onHostViewUpdated((data: { hostSocketId: string; transform: CanvasTransform }) => {
+        applyHostView(data.transform);
+      });
       socketService.onError((data) => {
         console.warn('Socket error:', data.message);
       });
@@ -355,6 +368,40 @@ const App: React.FC = () => {
               borderRadius: '10px',
             }}>
               只读模式
+            </span>
+          )}
+          {isHost && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: '#fff',
+              background: '#4caf50',
+              padding: '2px 8px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              🎤 主持人模式
+            </span>
+          )}
+          {followState.isFollowing && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: '#fff',
+              background: '#2196f3',
+              padding: '2px 8px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer'
+            }}
+            onClick={stopFollowingHost}
+            title="点击取消跟随"
+            >
+              👁️ 跟随 {followState.hostUsername}
             </span>
           )}
         </div>

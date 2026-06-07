@@ -12,8 +12,10 @@ import { CreatePollModal } from './CreatePollModal';
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
+  const isPanningRef = useRef(false);
   const currentPathRef = useRef<number[]>([]);
   const startPosRef = useRef({ x: 0, y: 0 });
+  const panStartRef = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
 
   const [addingComment, setAddingComment] = useState<{
     position: { x: number; y: number };
@@ -31,7 +33,10 @@ export const WhiteboardCanvas: React.FC = () => {
     showPresentationPanel,
     showTaskCardEditor,
     setShowTaskCardEditor,
-    loadPolls
+    loadPolls,
+    setCanvasTransform,
+    followState,
+    stopFollowingHost
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -83,6 +88,20 @@ export const WhiteboardCanvas: React.FC = () => {
   }, [board]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      if (followState.isFollowing) {
+        stopFollowingHost();
+      }
+      isPanningRef.current = true;
+      panStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        translateX: canvasTransform.translateX,
+        translateY: canvasTransform.translateY
+      };
+      return;
+    }
+
     if (!canEdit || isPresentationMode) return;
     const point = getCanvasPoint(e);
 
@@ -99,17 +118,33 @@ export const WhiteboardCanvas: React.FC = () => {
     isDrawingRef.current = true;
     startPosRef.current = point;
     currentPathRef.current = [point.x, point.y];
-  }, [canEdit, getCanvasPoint, activeTool, findElementAtPoint]);
+  }, [canEdit, getCanvasPoint, activeTool, findElementAtPoint, canvasTransform, followState.isFollowing, stopFollowingHost]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isPanningRef.current) {
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      setCanvasTransform({
+        scale: canvasTransform.scale,
+        translateX: panStartRef.current.translateX + dx,
+        translateY: panStartRef.current.translateY + dy
+      });
+      return;
+    }
+
     const point = getCanvasPoint(e);
     socketService.moveCursor(point.x, point.y);
 
     if (!isDrawingRef.current || !canEdit) return;
     currentPathRef.current.push(point.x, point.y);
-  }, [canEdit, getCanvasPoint]);
+  }, [canEdit, getCanvasPoint, canvasTransform, setCanvasTransform]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      return;
+    }
+
     if (!isDrawingRef.current || !canEdit) return;
     isDrawingRef.current = false;
     const point = getCanvasPoint(e);
@@ -282,7 +317,12 @@ export const WhiteboardCanvas: React.FC = () => {
     if (!canvas) return;
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const { canvasTransform, setCanvasTransform } = useWhiteboardStore.getState();
+      const { canvasTransform, setCanvasTransform, followState, stopFollowingHost } = useWhiteboardStore.getState();
+      
+      if (followState.isFollowing) {
+        stopFollowingHost();
+      }
+      
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       const newScale = Math.min(Math.max(canvasTransform.scale * delta, 0.1), 5);
       setCanvasTransform({
@@ -389,7 +429,10 @@ export const WhiteboardCanvas: React.FC = () => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { isDrawingRef.current = false; }}
+        onMouseLeave={() => { 
+          isDrawingRef.current = false; 
+          isPanningRef.current = false;
+        }}
       />
 
       {showStepOverlay && !isPresentationMode && presentationSteps.map((step, index) => (

@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData, Poll } from '../types';
+import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData, Poll, HostInfo } from '../types';
 
 const SERVER_URL = '/';
 
@@ -153,6 +153,38 @@ class SocketService {
     if (this.boardId) {
       this.socket?.emit('delete-poll', { boardId: this.boardId, pollId });
     }
+  }
+
+  setHost(isHost: boolean, userId: string, username: string): void {
+    if (this.boardId) {
+      this.socket?.emit('set-host', { boardId: this.boardId, isHost, userId, username });
+    }
+  }
+
+  broadcastHostView(transform: CanvasTransform): void {
+    if (this.boardId) {
+      this.socket?.emit('host-view-update', { boardId: this.boardId, transform });
+    }
+  }
+
+  requestFollowHost(hostSocketId: string): void {
+    if (this.boardId) {
+      this.socket?.emit('request-follow-host', { boardId: this.boardId, hostSocketId });
+    }
+  }
+
+  stopFollowing(): void {
+    if (this.boardId) {
+      this.socket?.emit('stop-following-host', { boardId: this.boardId });
+    }
+  }
+
+  onHostUpdated(callback: (data: HostInfo | null) => void): void {
+    this.socket?.on('host-updated', callback);
+  }
+
+  onHostViewUpdated(callback: (data: { hostSocketId: string; transform: CanvasTransform }) => void): void {
+    this.socket?.on('host-view-updated', callback);
   }
 
   onUserJoined(callback: (data: { socketId: string; username: string }) => void): void {

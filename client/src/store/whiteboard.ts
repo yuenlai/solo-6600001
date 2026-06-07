@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
 
@@ -30,6 +30,9 @@ interface WhiteboardState {
   showCreatePollModal: boolean;
   createPollPosition: { x: number; y: number } | null;
   selectedPollId: string | null;
+  hostInfo: HostInfo | null;
+  followState: FollowState;
+  isHost: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -91,6 +94,12 @@ interface WhiteboardState {
   closePoll: (pollId: string, closed: boolean) => Promise<Poll | null>;
   deletePoll: (pollId: string) => Promise<boolean>;
   updatePoll: (pollId: string, updates: Partial<Poll>) => void;
+  setHostInfo: (hostInfo: HostInfo | null) => void;
+  setIsHost: (isHost: boolean) => void;
+  toggleHostMode: () => void;
+  startFollowingHost: (hostSocketId: string, hostUsername: string) => void;
+  stopFollowingHost: () => void;
+  applyHostView: (transform: CanvasTransform) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -120,6 +129,13 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showCreatePollModal: false,
   createPollPosition: null,
   selectedPollId: null,
+  hostInfo: null,
+  followState: {
+    isFollowing: false,
+    hostSocketId: null,
+    hostUsername: null
+  },
+  isHost: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -192,6 +208,11 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setCanvasTransform: (transform) => {
     set({ canvasTransform: transform });
     socketService.canvasTransform(transform);
+    
+    const { isHost } = get();
+    if (isHost) {
+      socketService.broadcastHostView(transform);
+    }
   },
 
   updateCursor: (cursor) => {
@@ -636,5 +657,56 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     const polls = (board.polls || []).map(p => p.id === pollId ? { ...p, ...updates } : p);
     set({ board: { ...board, polls } });
     socketService.updatePoll(pollId, updates);
+  },
+
+  setHostInfo: (hostInfo) => set({ hostInfo }),
+
+  setIsHost: (isHost) => set({ isHost }),
+
+  toggleHostMode: () => {
+    const { isHost, username } = get();
+    const newIsHost = !isHost;
+    set({ isHost: newIsHost });
+    
+    const userId = 'user-1';
+    socketService.setHost(newIsHost, userId, username);
+    
+    if (newIsHost) {
+      const { canvasTransform } = get();
+      socketService.broadcastHostView(canvasTransform);
+    } else {
+      const { followState, stopFollowingHost } = get();
+      if (followState.isFollowing) {
+        stopFollowingHost();
+      }
+    }
+  },
+
+  startFollowingHost: (hostSocketId, hostUsername) => {
+    set({
+      followState: {
+        isFollowing: true,
+        hostSocketId,
+        hostUsername
+      }
+    });
+    socketService.requestFollowHost(hostSocketId);
+  },
+
+  stopFollowingHost: () => {
+    set({
+      followState: {
+        isFollowing: false,
+        hostSocketId: null,
+        hostUsername: null
+      }
+    });
+    socketService.stopFollowing();
+  },
+
+  applyHostView: (transform) => {
+    const { followState } = get();
+    if (!followState.isFollowing) return;
+    set({ canvasTransform: transform });
   },
 }));

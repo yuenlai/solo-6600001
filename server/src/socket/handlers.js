@@ -2,7 +2,8 @@ const { v4: uuidv4 } = require('uuid');
 const { readBoards } = require('../storage');
 
 const activeUsers = new Map(); // boardId -> Set of socket ids
-const cursorPositions = new Map(); // socketId -> { x, y, username, boardId, canEdit }
+const cursorPositions = new Map(); // socketId -> { x, y, username, boardId, canEdit, userId }
+const boardHosts = new Map(); // boardId -> { socketId, userId, username, canvasTransform, lastUpdatedAt }
 
 const canUserEdit = (board, userId, isShareAccess) => {
   if (!board) return false;
@@ -28,20 +29,41 @@ function setupSocketHandlers(io) {
       }
       activeUsers.get(boardId).add(socket.id);
       
-      cursorPositions.set(socket.id, { x: 0, y: 0, username, boardId, canEdit });
+      cursorPositions.set(socket.id, { x: 0, y: 0, username, boardId, canEdit, userId });
       
       // Notify others in the room
       socket.to(`board:${boardId}`).emit('user-joined', { socketId: socket.id, username, canEdit });
       
       // Send current active users to the joiner
       const users = [];
+      const currentHost = boardHosts.get(boardId);
       for (const [sid, data] of cursorPositions) {
         if (data.boardId === boardId && sid !== socket.id) {
-          users.push({ socketId: sid, username: data.username, x: data.x, y: data.y, canEdit: data.canEdit });
+          users.push({ 
+            socketId: sid, 
+            username: data.username, 
+            x: data.x, 
+            y: data.y, 
+            canEdit: data.canEdit,
+            isHost: currentHost && currentHost.socketId === sid
+          });
         }
       }
       socket.emit('active-users', users);
       socket.emit('permission-update', { canEdit });
+      
+      // Send current host info to the joiner
+      if (currentHost) {
+        socket.emit('host-updated', {
+          socketId: currentHost.socketId,
+          userId: currentHost.userId,
+          username: currentHost.username,
+          canvasTransform: currentHost.canvasTransform,
+          lastUpdatedAt: currentHost.lastUpdatedAt
+        });
+      } else {
+        socket.emit('host-updated', null);
+      }
     });
 
     socket.on('cursor-move', ({ boardId, x, y }) => {
@@ -173,6 +195,56 @@ function setupSocketHandlers(io) {
       socket.to(`board:${boardId}`).emit('poll-deleted', { pollId });
     });
 
+    socket.on('set-host', ({ boardId, isHost, userId, username }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos) return;
+
+      if (isHost) {
+        const hostInfo = {
+          socketId: socket.id,
+          userId,
+          username,
+          canvasTransform: { scale: 1, translateX: 0, translateY: 0 },
+          lastUpdatedAt: Date.now()
+        };
+        boardHosts.set(boardId, hostInfo);
+        io.to(`board:${boardId}`).emit('host-updated', hostInfo);
+      } else {
+        const currentHost = boardHosts.get(boardId);
+        if (currentHost && currentHost.socketId === socket.id) {
+          boardHosts.delete(boardId);
+          io.to(`board:${boardId}`).emit('host-updated', null);
+        }
+      }
+    });
+
+    socket.on('host-view-update', ({ boardId, transform }) => {
+      const currentHost = boardHosts.get(boardId);
+      if (!currentHost || currentHost.socketId !== socket.id) return;
+
+      currentHost.canvasTransform = transform;
+      currentHost.lastUpdatedAt = Date.now();
+      boardHosts.set(boardId, currentHost);
+
+      socket.to(`board:${boardId}`).emit('host-view-updated', {
+        hostSocketId: socket.id,
+        transform
+      });
+    });
+
+    socket.on('request-follow-host', ({ boardId, hostSocketId }) => {
+      const currentHost = boardHosts.get(boardId);
+      if (!currentHost || currentHost.socketId !== hostSocketId) return;
+
+      socket.emit('host-view-updated', {
+        hostSocketId: currentHost.socketId,
+        transform: currentHost.canvasTransform
+      });
+    });
+
+    socket.on('stop-following-host', ({ boardId }) => {
+    });
+
     socket.on('disconnect', () => {
       const pos = cursorPositions.get(socket.id);
       if (pos) {
@@ -184,6 +256,12 @@ function setupSocketHandlers(io) {
         }
         cursorPositions.delete(socket.id);
         socket.to(`board:${boardId}`).emit('user-left', { socketId: socket.id, username });
+        
+        const currentHost = boardHosts.get(boardId);
+        if (currentHost && currentHost.socketId === socket.id) {
+          boardHosts.delete(boardId);
+          io.to(`board:${boardId}`).emit('host-updated', null);
+        }
       }
       console.log(`User disconnected: ${socket.id}`);
     });

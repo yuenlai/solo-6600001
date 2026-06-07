@@ -77,6 +77,21 @@ export interface CursorPosition {
   username: string;
   x: number;
   y: number;
+  isHost?: boolean;
+}
+
+export interface HostInfo {
+  socketId: string;
+  userId: string;
+  username: string;
+  canvasTransform: CanvasTransform;
+  lastUpdatedAt: number;
+}
+
+export interface FollowState {
+  isFollowing: boolean;
+  hostSocketId: string | null;
+  hostUsername: string | null;
 }
 
 export interface CanvasTransform {

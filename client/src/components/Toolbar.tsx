@@ -16,7 +16,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
 ];
 
 export const Toolbar: React.FC = () => {
-  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit } = useWhiteboardStore();
+  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost } = useWhiteboardStore();
 
   return (
     <div style={{
@@ -102,6 +102,43 @@ export const Toolbar: React.FC = () => {
           }}
         >
           🗳️
+        </button>
+      )}
+      <div style={{ width: '100%', height: '1px', background: '#ddd' }} />
+      {canEdit && (
+        <button
+          onClick={toggleHostMode}
+          title={isHost ? '取消主持人模式' : '开启主持人模式'}
+          style={{
+            width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+            background: isHost ? '#4caf50' : 'transparent',
+            cursor: 'pointer', fontSize: '18px', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            color: isHost ? '#fff' : 'inherit'
+          }}
+        >
+          🎤
+        </button>
+      )}
+      {hostInfo && !isHost && (
+        <button
+          onClick={() => {
+            if (followState.isFollowing) {
+              stopFollowingHost();
+            } else {
+              startFollowingHost(hostInfo.socketId, hostInfo.username);
+            }
+          }}
+          title={followState.isFollowing ? `取消跟随 ${followState.hostUsername}` : `跟随 ${hostInfo.username} 的视角`}
+          style={{
+            width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+            background: followState.isFollowing ? '#2196f3' : 'transparent',
+            cursor: 'pointer', fontSize: '18px', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            color: followState.isFollowing ? '#fff' : 'inherit'
+          }}
+        >
+          👁️
         </button>
       )}
     </div>
