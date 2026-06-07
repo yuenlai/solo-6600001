@@ -1,9 +1,12 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useWhiteboardStore } from '../store/whiteboard';
 import { BoardElement, NoteGroup } from '../types';
+import { useMobile } from '../hooks/useMobile';
 
 const MINIMAP_WIDTH = 240;
 const MINIMAP_HEIGHT = 180;
+const MINIMAP_WIDTH_MOBILE = 200;
+const MINIMAP_HEIGHT_MOBILE = 150;
 const PADDING = 8;
 
 const getElementBounds = (el: BoardElement) => {
@@ -51,6 +54,7 @@ export const Minimap: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDraggingRef = useRef(false);
   const [, forceUpdate] = useState({});
+  const { isMobile, isSmallScreen } = useMobile();
 
   const {
     board,
@@ -60,6 +64,9 @@ export const Minimap: React.FC = () => {
     setShowMinimap,
     noteGroups,
   } = useWhiteboardStore();
+
+  const mapWidth = isSmallScreen ? MINIMAP_WIDTH_MOBILE : MINIMAP_WIDTH;
+  const mapHeight = isSmallScreen ? MINIMAP_HEIGHT_MOBILE : MINIMAP_HEIGHT;
 
   const calculateContentBounds = useCallback(() => {
     if (!board) return { minX: 0, minY: 0, maxX: 1000, maxY: 800 };
@@ -103,6 +110,71 @@ export const Minimap: React.FC = () => {
     };
   }, [board, noteGroups]);
 
+  const handleMinimapInteractionFromEvent = useCallback(
+    (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas || !board) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      const bounds = calculateContentBounds();
+      const contentWidth = bounds.maxX - bounds.minX;
+      const contentHeight = bounds.maxY - bounds.minY;
+
+      const scaleX = (mapWidth - PADDING * 2) / contentWidth;
+      const scaleY = (mapHeight - PADDING * 2) / contentHeight;
+      const scale = Math.min(scaleX, scaleY);
+
+      const offsetX = PADDING + (mapWidth - PADDING * 2 - contentWidth * scale) / 2;
+      const offsetY = PADDING + (mapHeight - PADDING * 2 - contentHeight * scale) / 2;
+
+      const worldX = (x - offsetX) / scale + bounds.minX;
+      const worldY = (y - offsetY) / scale + bounds.minY;
+
+      const mainCanvas = document.querySelector('canvas');
+      if (!mainCanvas) return;
+
+      const mainRect = mainCanvas.getBoundingClientRect();
+
+      const translateX = mainRect.width / 2 - worldX * canvasTransform.scale;
+      const translateY = mainRect.height / 2 - worldY * canvasTransform.scale;
+
+      setCanvasTransform({
+        ...canvasTransform,
+        translateX,
+        translateY,
+      });
+    },
+    [board, canvasTransform, calculateContentBounds, setCanvasTransform, mapWidth, mapHeight]
+  );
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      isDraggingRef.current = true;
+      const touch = e.touches[0];
+      handleMinimapInteractionFromEvent(touch.clientX, touch.clientY);
+    },
+    [handleMinimapInteractionFromEvent]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      if (!isDraggingRef.current) return;
+      const touch = e.touches[0];
+      handleMinimapInteractionFromEvent(touch.clientX, touch.clientY);
+    },
+    [handleMinimapInteractionFromEvent]
+  );
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    isDraggingRef.current = false;
+  }, []);
+
   const renderMinimap = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !board) return;
@@ -114,21 +186,21 @@ export const Minimap: React.FC = () => {
     const contentWidth = bounds.maxX - bounds.minX;
     const contentHeight = bounds.maxY - bounds.minY;
 
-    const scaleX = (MINIMAP_WIDTH - PADDING * 2) / contentWidth;
-    const scaleY = (MINIMAP_HEIGHT - PADDING * 2) / contentHeight;
+    const scaleX = (mapWidth - PADDING * 2) / contentWidth;
+    const scaleY = (mapHeight - PADDING * 2) / contentHeight;
     const scale = Math.min(scaleX, scaleY);
 
-    const offsetX = PADDING + (MINIMAP_WIDTH - PADDING * 2 - contentWidth * scale) / 2;
-    const offsetY = PADDING + (MINIMAP_HEIGHT - PADDING * 2 - contentHeight * scale) / 2;
+    const offsetX = PADDING + (mapWidth - PADDING * 2 - contentWidth * scale) / 2;
+    const offsetY = PADDING + (mapHeight - PADDING * 2 - contentHeight * scale) / 2;
 
-    ctx.clearRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
+    ctx.clearRect(0, 0, mapWidth, mapHeight);
 
     ctx.fillStyle = board.backgroundColor || '#f5f5f5';
-    ctx.fillRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
+    ctx.fillRect(0, 0, mapWidth, mapHeight);
 
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 1;
-    ctx.strokeRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
+    ctx.strokeRect(0, 0, mapWidth, mapHeight);
 
     noteGroups.forEach((group: NoteGroup) => {
       const x = offsetX + (group.x - bounds.minX) * scale;
@@ -242,45 +314,7 @@ export const Minimap: React.FC = () => {
     return () => clearInterval(interval);
   }, [showMinimap]);
 
-  const handleMinimapInteraction = useCallback(
-    (clientX: number, clientY: number) => {
-      const canvas = canvasRef.current;
-      if (!canvas || !board) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
-
-      const bounds = calculateContentBounds();
-      const contentWidth = bounds.maxX - bounds.minX;
-      const contentHeight = bounds.maxY - bounds.minY;
-
-      const scaleX = (MINIMAP_WIDTH - PADDING * 2) / contentWidth;
-      const scaleY = (MINIMAP_HEIGHT - PADDING * 2) / contentHeight;
-      const scale = Math.min(scaleX, scaleY);
-
-      const offsetX = PADDING + (MINIMAP_WIDTH - PADDING * 2 - contentWidth * scale) / 2;
-      const offsetY = PADDING + (MINIMAP_HEIGHT - PADDING * 2 - contentHeight * scale) / 2;
-
-      const worldX = (x - offsetX) / scale + bounds.minX;
-      const worldY = (y - offsetY) / scale + bounds.minY;
-
-      const mainCanvas = document.querySelector('canvas');
-      if (!mainCanvas) return;
-
-      const mainRect = mainCanvas.getBoundingClientRect();
-
-      const translateX = mainRect.width / 2 - worldX * canvasTransform.scale;
-      const translateY = mainRect.height / 2 - worldY * canvasTransform.scale;
-
-      setCanvasTransform({
-        ...canvasTransform,
-        translateX,
-        translateY,
-      });
-    },
-    [board, canvasTransform, calculateContentBounds, setCanvasTransform]
-  );
+  const handleMinimapInteraction = handleMinimapInteractionFromEvent;
 
   const resetView = useCallback(() => {
     const { resetView: reset } = useWhiteboardStore.getState();
@@ -397,17 +431,22 @@ export const Minimap: React.FC = () => {
       </div>
       <canvas
         ref={canvasRef}
-        width={MINIMAP_WIDTH}
-        height={MINIMAP_HEIGHT}
+        width={mapWidth}
+        height={mapHeight}
         style={{
           display: 'block',
-          cursor: 'grab',
+          cursor: isMobile ? 'pointer' : 'grab',
+          touchAction: 'none',
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onDoubleClick={handleDoubleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         title="拖动移动视角，双击重置视图"
       />
     </div>

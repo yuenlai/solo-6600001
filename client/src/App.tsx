@@ -19,6 +19,7 @@ import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
 import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType, Comment, CommentReply, Notification, TimerState } from './types';
+import { useMobile } from './hooks/useMobile';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -26,6 +27,8 @@ const App: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [loadingSharedBoard, setLoadingSharedBoard] = useState(false);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [showToolbarMobile, setShowToolbarMobile] = useState(true);
+  const { isSmallScreen } = useMobile();
   const {
     board, setBoard, updateCursor, removeCursor, setCursors, username,
     canEdit, setCanEdit, setIsShareAccess, showCommentPanel, setShowCommentPanel,
@@ -33,7 +36,7 @@ const App: React.FC = () => {
     isHost, followState, loadNotifications, loadUnreadCount,
     addNotification, unreadNotificationCount, showNotificationPanel,
     setShowNotificationPanel, loadAssets, showTimerPanel, setShowTimerPanel,
-    syncTimerState, syncState, resetOnboarding
+    syncTimerState, syncState, resetOnboarding, setShowSearchPanel
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -423,28 +426,30 @@ const App: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <div style={{
-        height: '48px',
+        height: isSmallScreen ? '44px' : '48px',
         background: '#fff',
         borderBottom: '1px solid #e5e7eb',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 16px',
-        gap: '12px',
+        padding: isSmallScreen ? '0 8px' : '0 16px',
+        gap: isSmallScreen ? '6px' : '12px',
+        flexShrink: 0,
       }}>
         <button
           onClick={handleBackToDashboard}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            fontSize: '13px',
+            gap: '4px',
+            padding: isSmallScreen ? '6px 8px' : '6px 12px',
+            fontSize: isSmallScreen ? '12px' : '13px',
             fontWeight: 500,
             color: '#374151',
             background: '#f3f4f6',
             border: 'none',
             borderRadius: '6px',
             cursor: 'pointer',
+            flexShrink: 0,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#e5e7eb';
@@ -457,18 +462,27 @@ const App: React.FC = () => {
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-          返回工作台
+          {!isSmallScreen && '返回工作台'}
         </button>
         <div style={{
-          fontSize: '14px',
+          fontSize: isSmallScreen ? '13px' : '14px',
           fontWeight: 600,
           color: '#1a1a1a',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '6px',
+          overflow: 'hidden',
+          flexShrink: 1,
+          minWidth: 0,
         }}>
-          {activeBoard?.name}
-          {!canEdit && (
+          <span style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {activeBoard?.name}
+          </span>
+          {!canEdit && !isSmallScreen && (
             <span style={{
               fontSize: '11px',
               fontWeight: 500,
@@ -476,55 +490,59 @@ const App: React.FC = () => {
               background: '#f3f4f6',
               padding: '2px 8px',
               borderRadius: '10px',
+              flexShrink: 0,
             }}>
-              只读模式
+              只读
             </span>
           )}
-          {isHost && (
+          {isHost && !isSmallScreen && (
             <span style={{
               fontSize: '11px',
               fontWeight: 500,
               color: '#fff',
               background: '#4caf50',
-              padding: '2px 8px',
+              padding: '2px 6px',
               borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '2px',
+              flexShrink: 0,
             }}>
-              🎤 主持人模式
+              🎤 主持
             </span>
           )}
-          {followState.isFollowing && (
+          {followState.isFollowing && !isSmallScreen && (
             <span style={{
               fontSize: '11px',
               fontWeight: 500,
               color: '#fff',
               background: '#2196f3',
-              padding: '2px 8px',
+              padding: '2px 6px',
               borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer'
+              gap: '2px',
+              cursor: 'pointer',
+              flexShrink: 0,
             }}
             onClick={stopFollowingHost}
             title="点击取消跟随"
             >
-              👁️ 跟随 {followState.hostUsername}
+              👁️ 跟随
             </span>
           )}
           {currentView === 'board' && (
             <span style={{
-              fontSize: '11px',
+              fontSize: isSmallScreen ? '10px' : '11px',
               fontWeight: 500,
               color: syncState.isOnline ? '#059669' : '#dc2626',
               background: syncState.isOnline ? '#d1fae5' : '#fee2e2',
-              padding: '2px 8px',
+              padding: isSmallScreen ? '1px 5px' : '2px 8px',
               borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '3px',
+              flexShrink: 0,
             }}
             title={syncState.isOnline ? '已连接' : '连接断开'}
             >
@@ -533,203 +551,275 @@ const App: React.FC = () => {
                   <>
                     <span style={{
                       display: 'inline-block',
-                      width: '8px',
-                      height: '8px',
+                      width: isSmallScreen ? '6px' : '8px',
+                      height: isSmallScreen ? '6px' : '8px',
                       borderRadius: '50%',
                       background: '#059669',
                       animation: 'pulse 1.5s ease-in-out infinite'
                     }} />
-                    同步中 ({syncState.pendingOperations.length})
+                    {!isSmallScreen && `同步中 (${syncState.pendingOperations.length})`}
                   </>
                 ) : (
-                  <>● 已同步</>
+                  <>{isSmallScreen ? '●' : '● 已同步'}</>
                 )
               ) : (
-                <>⚠ 离线</>
+                <>{isSmallScreen ? '⚠' : '⚠ 离线'}</>
               )}
             </span>
           )}
         </div>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={() => setShowCommentPanel(!showCommentPanel)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            fontSize: '13px',
-            fontWeight: 500,
-            color: showCommentPanel ? '#fff' : '#374151',
-            background: showCommentPanel ? '#2196f3' : '#f3f4f6',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (!showCommentPanel) {
-              e.currentTarget.style.background = '#e5e7eb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!showCommentPanel) {
-              e.currentTarget.style.background = '#f3f4f6';
-            }
-          }}
-        >
-          💬
-          评论
-          {(() => {
-            const unresolvedCount = board?.comments?.filter((c) => !c.resolved).length || 0;
-            return unresolvedCount > 0 ? (
-              <span style={{
-                background: '#f44336',
-                color: '#fff',
-                borderRadius: '10px',
-                padding: '0 6px',
-                fontSize: '11px',
-                minWidth: '18px',
-                textAlign: 'center'
-              }}>
-                {unresolvedCount}
-              </span>
-            ) : null;
-          })()}
-        </button>
-        <button
-          onClick={() => setShowNotificationPanel(!showNotificationPanel)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            fontSize: '13px',
-            fontWeight: 500,
-            color: showNotificationPanel ? '#fff' : '#374151',
-            background: showNotificationPanel ? '#f59e0b' : '#f3f4f6',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            position: 'relative',
-          }}
-          onMouseEnter={(e) => {
-            if (!showNotificationPanel) {
-              e.currentTarget.style.background = '#e5e7eb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!showNotificationPanel) {
-              e.currentTarget.style.background = '#f3f4f6';
-            }
-          }}
-        >
-          🔔
-          通知
-          {unreadNotificationCount > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              background: '#f44336',
-              color: '#fff',
-              borderRadius: '10px',
-              padding: '0 6px',
-              fontSize: '10px',
-              fontWeight: 600,
-              minWidth: '18px',
-              textAlign: 'center',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            }}>
-              {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setShowTimerPanel(!showTimerPanel)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            fontSize: '13px',
-            fontWeight: 500,
-            color: showTimerPanel ? '#fff' : '#374151',
-            background: showTimerPanel ? '#667eea' : '#f3f4f6',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (!showTimerPanel) {
-              e.currentTarget.style.background = '#e5e7eb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!showTimerPanel) {
-              e.currentTarget.style.background = '#f3f4f6';
-            }
-          }}
-        >
-          ⏱️
-          计时
-        </button>
-        <button
-          onClick={() => resetOnboarding()}
-          title="查看使用引导"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            fontSize: '13px',
-            fontWeight: 500,
-            color: '#374151',
-            background: '#f3f4f6',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#e5e7eb';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#f3f4f6';
-          }}
-        >
-          ❓
-          帮助
-        </button>
-        {!useWhiteboardStore.getState().isShareAccess && canEdit && (
-          <button
-            onClick={handleArchiveBoard}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              fontSize: '13px',
-              fontWeight: 500,
-              color: '#374151',
-              background: '#f3f4f6',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#e5e7eb';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f3f4f6';
-            }}
-          >
-            📦
-            归档
-          </button>
+        <div style={{ flex: 1, minWidth: isSmallScreen ? '4px' : 0 }} />
+        {!isSmallScreen && (
+          <>
+            <button
+              onClick={() => setShowCommentPanel(!showCommentPanel)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: showCommentPanel ? '#fff' : '#374151',
+                background: showCommentPanel ? '#2196f3' : '#f3f4f6',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                if (!showCommentPanel) {
+                  e.currentTarget.style.background = '#e5e7eb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showCommentPanel) {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }
+              }}
+            >
+              💬
+              评论
+              {(() => {
+                const unresolvedCount = board?.comments?.filter((c) => !c.resolved).length || 0;
+                return unresolvedCount > 0 ? (
+                  <span style={{
+                    background: '#f44336',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    padding: '0 6px',
+                    fontSize: '11px',
+                    minWidth: '18px',
+                    textAlign: 'center'
+                  }}>
+                    {unresolvedCount}
+                  </span>
+                ) : null;
+              })()}
+            </button>
+            <button
+              onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: showNotificationPanel ? '#fff' : '#374151',
+                background: showNotificationPanel ? '#f59e0b' : '#f3f4f6',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                position: 'relative',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                if (!showNotificationPanel) {
+                  e.currentTarget.style.background = '#e5e7eb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showNotificationPanel) {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }
+              }}
+            >
+              🔔
+              通知
+              {unreadNotificationCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  background: '#f44336',
+                  color: '#fff',
+                  borderRadius: '10px',
+                  padding: '0 6px',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  minWidth: '18px',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }}>
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowTimerPanel(!showTimerPanel)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: showTimerPanel ? '#fff' : '#374151',
+                background: showTimerPanel ? '#667eea' : '#f3f4f6',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                if (!showTimerPanel) {
+                  e.currentTarget.style.background = '#e5e7eb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showTimerPanel) {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }
+              }}
+            >
+              ⏱️
+              计时
+            </button>
+            <button
+              onClick={() => resetOnboarding()}
+              title="查看使用引导"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#374151',
+                background: '#f3f4f6',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f3f4f6';
+              }}
+            >
+              ❓
+              帮助
+            </button>
+            {!useWhiteboardStore.getState().isShareAccess && canEdit && (
+              <button
+                onClick={handleArchiveBoard}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#374151',
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }}
+              >
+                📦
+                归档
+              </button>
+            )}
+          </>
+        )}
+        {isSmallScreen && (
+          <>
+            <button
+              onClick={() => setShowSearchPanel(true)}
+              style={{
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                background: '#f3f4f6',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+              title="搜索"
+            >
+              🔍
+            </button>
+            <button
+              onClick={() => setShowCommentPanel(!showCommentPanel)}
+              style={{
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                background: showCommentPanel ? '#2196f3' : '#f3f4f6',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                flexShrink: 0,
+                position: 'relative',
+              }}
+              title="评论"
+            >
+              💬
+              {(() => {
+                const unresolvedCount = board?.comments?.filter((c) => !c.resolved).length || 0;
+                return unresolvedCount > 0 ? (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-2px',
+                    background: '#f44336',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    padding: '0 5px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    minWidth: '16px',
+                    textAlign: 'center',
+                  }}>
+                    {unresolvedCount > 9 ? '9+' : unresolvedCount}
+                  </span>
+                ) : null;
+              })()}
+            </button>
+          </>
         )}
         {!useWhiteboardStore.getState().isShareAccess && (
           <span className="collaboration-area">
@@ -738,9 +828,9 @@ const App: React.FC = () => {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                fontSize: '13px',
+                gap: isSmallScreen ? '4px' : '6px',
+                padding: isSmallScreen ? '6px 10px' : '6px 12px',
+                fontSize: isSmallScreen ? '12px' : '13px',
                 fontWeight: 500,
                 color: '#fff',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -748,6 +838,7 @@ const App: React.FC = () => {
                 borderRadius: '6px',
                 cursor: 'pointer',
                 transition: 'opacity 0.2s',
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.opacity = '0.9';
@@ -763,13 +854,39 @@ const App: React.FC = () => {
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
               </svg>
-              分享
+              {isSmallScreen ? '分享' : '分享'}
             </button>
           </span>
         )}
       </div>
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Toolbar />
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {(!isSmallScreen || showToolbarMobile) && <Toolbar />}
+        {isSmallScreen && (
+          <button
+            onClick={() => setShowToolbarMobile(!showToolbarMobile)}
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: showToolbarMobile ? '76px' : '8px',
+              zIndex: 100,
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              cursor: 'pointer',
+              fontSize: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'left 0.2s ease',
+            }}
+            title={showToolbarMobile ? '隐藏工具栏' : '显示工具栏'}
+          >
+            {showToolbarMobile ? '◀' : '▶'}
+          </button>
+        )}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <WhiteboardCanvas />
           <CursorOverlay />
@@ -781,7 +898,7 @@ const App: React.FC = () => {
           <Minimap />
           <TimerPanel />
         </div>
-        {canEdit && <LayerPanel />}
+        {canEdit && !isSmallScreen && <LayerPanel />}
       </div>
       <ShareModal
         isOpen={isShareModalOpen}

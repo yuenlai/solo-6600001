@@ -10,6 +10,7 @@ import { VotePoll } from './VotePoll';
 import { CreatePollModal } from './CreatePollModal';
 import { NoteGroupPanel } from './NoteGroupPanel';
 import { ExportModal } from './ExportModal';
+import { useMobile } from '../hooks/useMobile';
 
 const imageCache = new Map<string, HTMLImageElement>();
 
@@ -34,6 +35,19 @@ export const WhiteboardCanvas: React.FC = () => {
   const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [editingText, setEditingText] = useState<string>('');
+  
+  const { isMobile, isSmallScreen } = useMobile();
+  
+  const touchStartRef = useRef<{
+    touches: { x: number; y: number }[];
+    initialDistance: number;
+    initialScale: number;
+    initialTranslateX: number;
+    initialTranslateY: number;
+    midpoint: { x: number; y: number };
+  } | null>(null);
+  const lastTapTimeRef = useRef(0);
+  const touchTimeoutRef = useRef<number | null>(null);
 
   const [addingComment, setAddingComment] = useState<{
     position: { x: number; y: number };
@@ -492,6 +506,196 @@ export const WhiteboardCanvas: React.FC = () => {
       setEditingText(element.text || '');
     }
   }, [canEdit, isPresentationMode, activeTool, getCanvasPoint, findElementAtPoint, setSelectedElementId, setEditingElementId]);
+
+  const getTouchDistance = (touch1: React.Touch, touch2: React.Touch) => {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const getTouchMidpoint = (touch1: React.Touch, touch2: React.Touch) => {
+    return {
+      x: (touch1.clientX + touch2.clientX) / 2,
+      y: (touch1.clientY + touch2.clientY) / 2,
+    };
+  };
+
+  const getCanvasPointFromClient = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - canvasTransform.translateX) / canvasTransform.scale,
+      y: (clientY - rect.top - canvasTransform.translateY) / canvasTransform.scale
+    };
+  }, [canvasTransform]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    
+    if (touchTimeoutRef.current) {
+      clearTimeout(touchTimeoutRef.current);
+      touchTimeoutRef.current = null;
+    }
+
+    const now = Date.now();
+    
+    if (e.touches.length === 2) {
+      isPanningRef.current = true;
+      setIsPanning(true);
+      
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = getTouchDistance(touch1, touch2);
+      const midpoint = getTouchMidpoint(touch1, touch2);
+      
+      touchStartRef.current = {
+        touches: [
+          { x: touch1.clientX, y: touch1.clientY },
+          { x: touch2.clientX, y: touch2.clientY },
+        ],
+        initialDistance: distance,
+        initialScale: canvasTransform.scale,
+        initialTranslateX: canvasTransform.translateX,
+        initialTranslateY: canvasTransform.translateY,
+        midpoint,
+      };
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const timeSinceLastTap = now - lastTapTimeRef.current;
+      
+      if (timeSinceLastTap < 300) {
+        lastTapTimeRef.current = 0;
+        const point = getCanvasPointFromClient(touch.clientX, touch.clientY);
+        const element = findElementAtPoint(point.x, point.y);
+        
+        if (element && (element.type === 'text' || element.type === 'sticky-note') && canEdit && !isPresentationMode) {
+          setSelectedElementId(element.id);
+          setEditingElementId(element.id);
+          setEditingText(element.text || '');
+        } else {
+          resetView();
+        }
+        return;
+      }
+      
+      lastTapTimeRef.current = now;
+      
+      touchTimeoutRef.current = window.setTimeout(() => {
+        if (!isDrawingRef.current && !isPanningRef.current) {
+          const point = getCanvasPointFromClient(touch.clientX, touch.clientY);
+          const element = findElementAtPoint(point.x, point.y);
+          if (element && activeTool === 'select') {
+            setSelectedElementId(element.id);
+          }
+        }
+      }, 200);
+      
+      if (followState.isFollowing) {
+        stopFollowingHost();
+      }
+      
+      startPanning(touch.clientX, touch.clientY);
+    }
+  }, [canvasTransform, canEdit, isPresentationMode, activeTool, findElementAtPoint, getCanvasPointFromClient, resetView, startPanning, followState.isFollowing, stopFollowingHost]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    
+    if (touchTimeoutRef.current) {
+      clearTimeout(touchTimeoutRef.current);
+      touchTimeoutRef.current = null;
+    }
+
+    if (e.touches.length === 2 && touchStartRef.current) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = getTouchDistance(touch1, touch2);
+      const currentMidpoint = getTouchMidpoint(touch1, touch2);
+      
+      const scaleDelta = currentDistance / touchStartRef.current.initialDistance;
+      let newScale = touchStartRef.current.initialScale * scaleDelta;
+      newScale = Math.min(Math.max(newScale, 0.1), 5);
+      
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        
+        const midX = currentMidpoint.x - rect.left;
+        const midY = currentMidpoint.y - rect.top;
+        
+        const worldX = (touchStartRef.current.midpoint.x - rect.left - touchStartRef.current.initialTranslateX) / touchStartRef.current.initialScale;
+        const worldY = (touchStartRef.current.midpoint.y - rect.top - touchStartRef.current.initialTranslateY) / touchStartRef.current.initialScale;
+        
+        const panDeltaX = currentMidpoint.x - touchStartRef.current.midpoint.x;
+        const panDeltaY = currentMidpoint.y - touchStartRef.current.midpoint.y;
+        
+        const newTranslateX = midX - worldX * newScale + panDeltaX;
+        const newTranslateY = midY - worldY * newScale + panDeltaY;
+        
+        setCanvasTransform({
+          scale: newScale,
+          translateX: newTranslateX,
+          translateY: newTranslateY,
+        });
+      }
+      return;
+    }
+
+    if (e.touches.length === 1 && isPanningRef.current) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - panStartRef.current.x;
+      const dy = touch.clientY - panStartRef.current.y;
+      
+      const now = Date.now();
+      const dt = now - lastPanPosRef.current.time;
+      if (dt > 0) {
+        velocityRef.current = {
+          vx: (touch.clientX - lastPanPosRef.current.x) / dt * 16,
+          vy: (touch.clientY - lastPanPosRef.current.y) / dt * 16,
+        };
+      }
+      lastPanPosRef.current = { x: touch.clientX, y: touch.clientY, time: now };
+      
+      setCanvasTransform({
+        scale: canvasTransform.scale,
+        translateX: panStartRef.current.translateX + dx,
+        translateY: panStartRef.current.translateY + dy,
+      });
+    }
+  }, [canvasTransform, setCanvasTransform]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    
+    if (touchTimeoutRef.current) {
+      clearTimeout(touchTimeoutRef.current);
+      touchTimeoutRef.current = null;
+    }
+
+    if (e.touches.length === 0) {
+      touchStartRef.current = null;
+      
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        setIsPanning(false);
+        applyInertia();
+      }
+    } else if (e.touches.length === 1 && touchStartRef.current) {
+      const touch = e.touches[0];
+      panStartRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        translateX: canvasTransform.translateX,
+        translateY: canvasTransform.translateY,
+      };
+      lastPanPosRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+      velocityRef.current = { vx: 0, vy: 0 };
+    }
+  }, [canvasTransform, applyInertia]);
 
   const handleCommentMarkerClick = (comment: Comment, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1185,8 +1389,11 @@ export const WhiteboardCanvas: React.FC = () => {
         style={{
           width: '100%',
           height: '100%',
-          cursor: isPanning ? 'grabbing' : spacePressedRef.current ? 'grab' : isPresentationMode ? 'default' : activeTool === 'comment' ? 'pointer' : !canEdit ? 'default' : activeTool === 'select' ? 'default' : 'crosshair',
-          backgroundColor: board?.backgroundColor || '#f5f5f5'
+          cursor: isMobile ? 'default' : (isPanning ? 'grabbing' : spacePressedRef.current ? 'grab' : isPresentationMode ? 'default' : activeTool === 'comment' ? 'pointer' : !canEdit ? 'default' : activeTool === 'select' ? 'default' : 'crosshair'),
+          backgroundColor: board?.backgroundColor || '#f5f5f5',
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -1198,6 +1405,10 @@ export const WhiteboardCanvas: React.FC = () => {
           setIsHoveringCanvas(false);
         }}
         onDoubleClick={handleDoubleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       />
 
       {editingElementId && (() => {
@@ -1413,16 +1624,16 @@ export const WhiteboardCanvas: React.FC = () => {
       <div
         style={{
           position: 'absolute',
-          bottom: '16px',
+          bottom: isSmallScreen ? '16px' : '16px',
           left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
-          padding: '6px 8px',
+          gap: isSmallScreen ? '8px' : '4px',
+          padding: isSmallScreen ? '10px 12px' : '6px 8px',
           background: 'rgba(255, 255, 255, 0.95)',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          borderRadius: isSmallScreen ? '12px' : '8px',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
           border: '1px solid #e5e7eb',
           zIndex: 500,
           backdropFilter: 'blur(8px)',
@@ -1430,19 +1641,20 @@ export const WhiteboardCanvas: React.FC = () => {
       >
         <button
           onClick={zoomOut}
-          title="缩小 (Ctrl/-)"
+          title="缩小"
           style={{
-            width: '32px',
-            height: '32px',
+            width: isSmallScreen ? '44px' : '32px',
+            height: isSmallScreen ? '44px' : '32px',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: isSmallScreen ? '10px' : '6px',
             background: 'transparent',
             cursor: 'pointer',
-            fontSize: '18px',
+            fontSize: isSmallScreen ? '22px' : '18px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             transition: 'all 0.15s',
+            touchAction: 'manipulation',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f3f4f6';
@@ -1455,22 +1667,23 @@ export const WhiteboardCanvas: React.FC = () => {
         </button>
         <button
           onClick={resetView}
-          title="重置视图 (Ctrl+0)"
+          title="重置视图"
           style={{
-            minWidth: '60px',
-            height: '28px',
+            minWidth: isSmallScreen ? '80px' : '60px',
+            height: isSmallScreen ? '40px' : '28px',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: isSmallScreen ? '10px' : '6px',
             background: '#f3f4f6',
             cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: 500,
+            fontSize: isSmallScreen ? '14px' : '12px',
+            fontWeight: 600,
             color: '#374151',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '0 10px',
+            padding: isSmallScreen ? '0 16px' : '0 10px',
             transition: 'all 0.15s',
+            touchAction: 'manipulation',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#e5e7eb';
@@ -1483,19 +1696,20 @@ export const WhiteboardCanvas: React.FC = () => {
         </button>
         <button
           onClick={zoomIn}
-          title="放大 (Ctrl/+)"
+          title="放大"
           style={{
-            width: '32px',
-            height: '32px',
+            width: isSmallScreen ? '44px' : '32px',
+            height: isSmallScreen ? '44px' : '32px',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: isSmallScreen ? '10px' : '6px',
             background: 'transparent',
             cursor: 'pointer',
-            fontSize: '18px',
+            fontSize: isSmallScreen ? '22px' : '18px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             transition: 'all 0.15s',
+            touchAction: 'manipulation',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f3f4f6';
@@ -1506,6 +1720,31 @@ export const WhiteboardCanvas: React.FC = () => {
         >
           ➕
         </button>
+        {isSmallScreen && (
+          <button
+            onClick={() => {
+              const { setShowMinimap, showMinimap } = useWhiteboardStore.getState();
+              setShowMinimap(!showMinimap);
+            }}
+            title="小地图"
+            style={{
+              width: '44px',
+              height: '44px',
+              border: 'none',
+              borderRadius: '10px',
+              background: 'transparent',
+              cursor: 'pointer',
+              fontSize: '22px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s',
+              touchAction: 'manipulation',
+            }}
+          >
+            🗺️
+          </button>
+        )}
       </div>
 
       {!canEdit && (
