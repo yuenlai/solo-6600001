@@ -29,13 +29,14 @@ router.get('/:id', async (req, res) => {
 // Create a new board
 router.post('/', async (req, res) => {
   try {
-    const { name, ownerId, width, height } = req.body;
+    const { name, ownerId, width, height, backgroundColor, layers } = req.body;
     const board = new Board({
       name: name || 'Untitled Board',
       ownerId,
       width: width || 3000,
       height: height || 2000,
-      layers: [{ name: 'Layer 1', visible: true, locked: false, order: 0, elements: [] }]
+      backgroundColor: backgroundColor || '#ffffff',
+      layers: layers || [{ name: 'Layer 1', visible: true, locked: false, order: 0, elements: [] }]
     });
     await board.save();
     res.status(201).json(board);

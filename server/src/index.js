@@ -20,7 +20,9 @@ const io = new Server(httpServer, {
 
 // Routes
 const boardRoutes = require('./routes/boards');
+const templateRoutes = require('./routes/templates');
 app.use('/api/boards', boardRoutes);
+app.use('/api/templates', templateRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

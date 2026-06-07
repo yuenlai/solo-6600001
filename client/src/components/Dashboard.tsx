@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Board } from '../types';
-import { boardApi } from '../services/api';
+import { boardApi, templateApi } from '../services/api';
 import { useWhiteboardStore } from '../store/whiteboard';
+import { TemplateCenter } from './TemplateCenter';
 
 interface DashboardProps {
   onBoardSelect: (board: Board) => void;
@@ -128,146 +129,9 @@ const BoardCard: React.FC<{
   );
 };
 
-const CreateBoardModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onCreate: (name: string) => void;
-}> = ({ isOpen, onClose, onCreate }) => {
-  const [name, setName] = useState('');
-
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (name.trim()) {
-      onCreate(name.trim());
-      setName('');
-      onClose();
-    }
-  };
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: '16px',
-          padding: '32px',
-          width: '400px',
-          maxWidth: '90%',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: '20px',
-            fontWeight: 600,
-            color: '#1a1a1a',
-            marginBottom: '24px',
-          }}
-        >
-          新建白板
-        </h2>
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '24px' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '8px',
-              }}
-            >
-              白板名称
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="请输入白板名称"
-              autoFocus
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                fontSize: '14px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#667eea';
-                e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#374151',
-                background: '#f3f4f6',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#fff',
-                background: '#667eea',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: name.trim() ? 'pointer' : 'not-allowed',
-                opacity: name.trim() ? 1 : 0.5,
-              }}
-            >
-              创建
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
 export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
   const [boards, setBoards] = useState<Board[]>(boardApi.getMockBoards());
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isTemplateCenterOpen, setIsTemplateCenterOpen] = useState(false);
   const username = useWhiteboardStore((state) => state.username);
 
   const userId = 'user-1';
@@ -284,8 +148,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
     }
   };
 
-  const handleCreateBoard = async (name: string) => {
-    const newBoard = await boardApi.createBoard({ name, ownerId: userId });
+  const handleCreateBoard = async (name: string, templateId?: string) => {
+    let newBoard: Board | null = null;
+    if (templateId) {
+      newBoard = await templateApi.createBoardFromTemplate(templateId, { name, ownerId: userId });
+    } else {
+      newBoard = await boardApi.createBoard({ name, ownerId: userId });
+    }
     if (newBoard) {
       setBoards((prev) => [newBoard, ...prev]);
       onBoardSelect(newBoard);
@@ -451,7 +320,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => setIsTemplateCenterOpen(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -524,7 +393,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
           </p>
           <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
             <button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => setIsTemplateCenterOpen(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -564,9 +433,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
         </section>
       </main>
 
-      <CreateBoardModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+      <TemplateCenter
+        isOpen={isTemplateCenterOpen}
+        onClose={() => setIsTemplateCenterOpen(false)}
         onCreate={handleCreateBoard}
       />
     </div>

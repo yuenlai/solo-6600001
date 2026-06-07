@@ -51,3 +51,16 @@ export interface CanvasTransform {
 }
 
 export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'eraser';
+
+export interface Template {
+  _id: string;
+  name: string;
+  description: string;
+  category: string;
+  thumbnail: string;
+  icon: string;
+  width: number;
+  height: number;
+  backgroundColor: string;
+  layers?: Layer[];
+}
