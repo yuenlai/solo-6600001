@@ -97,31 +97,64 @@ const App: React.FC = () => {
         const { board: currentBoard } = useWhiteboardStore.getState();
         if (currentBoard) {
           const layers = [...currentBoard.layers];
-          const elements = layers[data.layerIndex].elements.map(el =>
-            el.id === data.elementId ? { ...el, ...data.updates } : el
-          );
-          layers[data.layerIndex] = { ...layers[data.layerIndex], elements };
-          setBoard({ ...currentBoard, layers });
+          let targetLayerIndex = data.layerIndex;
+          if (targetLayerIndex < 0 || targetLayerIndex >= layers.length || !layers[targetLayerIndex].elements.find(el => el.id === data.elementId)) {
+            for (let i = 0; i < layers.length; i++) {
+              if (layers[i].elements.find(el => el.id === data.elementId)) {
+                targetLayerIndex = i;
+                break;
+              }
+            }
+          }
+          if (targetLayerIndex >= 0 && targetLayerIndex < layers.length) {
+            const elements = layers[targetLayerIndex].elements.map(el =>
+              el.id === data.elementId ? { ...el, ...data.updates } : el
+            );
+            layers[targetLayerIndex] = { ...layers[targetLayerIndex], elements };
+            setBoard({ ...currentBoard, layers });
+          }
         }
       });
       socketService.onElementDeleted((data: { elementId: string; layerIndex: number }) => {
         const { board: currentBoard } = useWhiteboardStore.getState();
         if (currentBoard) {
           const layers = [...currentBoard.layers];
-          const elements = layers[data.layerIndex].elements.filter(el => el.id !== data.elementId);
-          layers[data.layerIndex] = { ...layers[data.layerIndex], elements };
-          setBoard({ ...currentBoard, layers });
+          let targetLayerIndex = data.layerIndex;
+          if (targetLayerIndex < 0 || targetLayerIndex >= layers.length || !layers[targetLayerIndex].elements.find(el => el.id === data.elementId)) {
+            for (let i = 0; i < layers.length; i++) {
+              if (layers[i].elements.find(el => el.id === data.elementId)) {
+                targetLayerIndex = i;
+                break;
+              }
+            }
+          }
+          if (targetLayerIndex >= 0 && targetLayerIndex < layers.length) {
+            const elements = layers[targetLayerIndex].elements.filter(el => el.id !== data.elementId);
+            layers[targetLayerIndex] = { ...layers[targetLayerIndex], elements };
+            setBoard({ ...currentBoard, layers });
+          }
         }
       });
       socketService.onTaskCardUpdated((data: { elementId: string; taskData: any; layerIndex: number }) => {
         const { board: currentBoard } = useWhiteboardStore.getState();
         if (currentBoard) {
           const layers = [...currentBoard.layers];
-          const elements = layers[data.layerIndex].elements.map(el =>
-            el.id === data.elementId ? { ...el, taskData: { ...el.taskData, ...data.taskData } } : el
-          );
-          layers[data.layerIndex] = { ...layers[data.layerIndex], elements };
-          setBoard({ ...currentBoard, layers });
+          let targetLayerIndex = data.layerIndex;
+          if (targetLayerIndex < 0 || targetLayerIndex >= layers.length || !layers[targetLayerIndex].elements.find(el => el.id === data.elementId)) {
+            for (let i = 0; i < layers.length; i++) {
+              if (layers[i].elements.find(el => el.id === data.elementId)) {
+                targetLayerIndex = i;
+                break;
+              }
+            }
+          }
+          if (targetLayerIndex >= 0 && targetLayerIndex < layers.length) {
+            const elements = layers[targetLayerIndex].elements.map(el =>
+              el.id === data.elementId ? { ...el, taskData: { ...el.taskData, ...data.taskData } } : el
+            );
+            layers[targetLayerIndex] = { ...layers[targetLayerIndex], elements };
+            setBoard({ ...currentBoard, layers });
+          }
         }
       });
       socketService.onLayersUpdated((data: { layers: Layer[] }) => {

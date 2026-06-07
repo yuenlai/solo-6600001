@@ -404,15 +404,24 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setShowMeetingMinutes: (show) => set({ showMeetingMinutes: show }),
 
   updateTaskCard: (elementId, taskData) => {
-    const { board, activeLayerIndex, canEdit } = get();
+    const { board, canEdit } = get();
     if (!board || !canEdit) return;
     const layers = [...board.layers];
-    const elements = layers[activeLayerIndex].elements.map(el =>
+    let layerIndex = -1;
+    for (let i = 0; i < layers.length; i++) {
+      const found = layers[i].elements.find(el => el.id === elementId);
+      if (found) {
+        layerIndex = i;
+        break;
+      }
+    }
+    if (layerIndex === -1) return;
+    const elements = layers[layerIndex].elements.map(el =>
       el.id === elementId ? { ...el, taskData: { ...el.taskData, ...taskData } } as BoardElement : el
     );
-    layers[activeLayerIndex] = { ...layers[activeLayerIndex], elements };
+    layers[layerIndex] = { ...layers[layerIndex], elements };
     set({ board: { ...board, layers } });
-    socketService.updateTaskCard(elementId, taskData, activeLayerIndex);
+    socketService.updateTaskCard(elementId, taskData, layerIndex);
   },
 
   setSelectedTaskCardId: (id) => set({ selectedTaskCardId: id }),
