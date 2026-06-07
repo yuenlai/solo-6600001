@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification, Asset, TimerPhase, TimerState, TimerSettings, SyncState, PendingOperation } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification, Asset, TimerPhase, TimerState, TimerSettings, SyncState, PendingOperation, OnboardingStep, OnboardingStepKey } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi, notificationApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
@@ -64,8 +64,18 @@ interface WhiteboardState {
   editingElementId: string | null;
   syncState: SyncState;
   locallyUpdatedElementIds: Set<string>;
+  showOnboarding: boolean;
+  onboardingStepIndex: number;
+  onboardingCompleted: boolean;
 
   // Actions
+  setShowOnboarding: (show: boolean) => void;
+  setOnboardingStepIndex: (index: number) => void;
+  nextOnboardingStep: () => void;
+  prevOnboardingStep: () => void;
+  completeOnboarding: () => void;
+  resetOnboarding: () => void;
+  getOnboardingSteps: () => OnboardingStep[];
   setSyncState: (state: Partial<SyncState>) => void;
   addPendingOperation: (op: Omit<PendingOperation, 'id' | 'timestamp' | 'retries'>) => void;
   removePendingOperation: (opId: string) => void;
@@ -285,6 +295,76 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     syncError: null,
   },
   locallyUpdatedElementIds: new Set(),
+  showOnboarding: false,
+  onboardingStepIndex: 0,
+  onboardingCompleted: false,
+
+  setShowOnboarding: (show) => set({ showOnboarding: show }),
+  setOnboardingStepIndex: (index) => set({ onboardingStepIndex: index }),
+  nextOnboardingStep: () => set((prev) => {
+    const steps = prev.getOnboardingSteps();
+    const nextIndex = Math.min(prev.onboardingStepIndex + 1, steps.length - 1);
+    return { onboardingStepIndex: nextIndex };
+  }),
+  prevOnboardingStep: () => set((prev) => {
+    const prevIndex = Math.max(prev.onboardingStepIndex - 1, 0);
+    return { onboardingStepIndex: prevIndex };
+  }),
+  completeOnboarding: () => {
+    set({ showOnboarding: false, onboardingCompleted: true });
+    localStorage.setItem('whiteboard_onboarding_completed', 'true');
+  },
+  resetOnboarding: () => {
+    set({ showOnboarding: true, onboardingStepIndex: 0, onboardingCompleted: false });
+    localStorage.removeItem('whiteboard_onboarding_completed');
+  },
+  getOnboardingSteps: () => [
+    {
+      key: 'welcome' as OnboardingStepKey,
+      title: '欢迎使用协作白板',
+      description: '这是一个功能强大的在线协作白板工具，让我们快速了解一下核心功能吧！',
+      icon: '👋',
+      position: 'top' as const,
+    },
+    {
+      key: 'toolbar' as OnboardingStepKey,
+      title: '左侧工具栏',
+      description: '这里有各种绘图工具：画笔、形状、文本、便签、任务卡片等。选择工具后即可在画布上创作。还可以调整颜色和线宽！',
+      icon: '🛠️',
+      highlightSelector: '.toolbar-container',
+      position: 'right' as const,
+    },
+    {
+      key: 'layers' as OnboardingStepKey,
+      title: '右侧图层面板',
+      description: '管理你的画布图层。可以创建新图层、切换可见性、锁定图层。顶部的图层会显示在最上方哦！',
+      icon: '📚',
+      highlightSelector: '.layer-panel-container',
+      position: 'left' as const,
+    },
+    {
+      key: 'collaboration' as OnboardingStepKey,
+      title: '实时协作',
+      description: '邀请他人一起协作！你可以看到其他人的光标位置，还能使用主持人模式控制大家的视角。点击顶部"分享"按钮邀请队友。',
+      icon: '🤝',
+      highlightSelector: '.collaboration-area',
+      position: 'bottom' as const,
+    },
+    {
+      key: 'canvas' as OnboardingStepKey,
+      title: '画布操作',
+      description: '滚轮缩放画布，按住空格键或鼠标中键拖动平移。选中元素后可以拖拽、调整大小。现在就试试创作吧！',
+      icon: '🎨',
+      position: 'top' as const,
+    },
+    {
+      key: 'complete' as OnboardingStepKey,
+      title: '太棒了！',
+      description: '你已经了解了白板的核心功能。更多功能等你来探索：演示模式、会议纪要、快照历史、投票、便签分组等。开始创作吧！',
+      icon: '🎉',
+      position: 'top' as const,
+    },
+  ],
 
   setSyncState: (state) => set((prev) => ({
     syncState: { ...prev.syncState, ...state }

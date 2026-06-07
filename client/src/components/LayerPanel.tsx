@@ -18,7 +18,7 @@ export const LayerPanel: React.FC = () => {
   if (!board) return null;
 
   return (
-    <div style={{
+    <div className="layer-panel-container" style={{
       width: '240px', background: '#fff', borderRadius: '8px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.15)', padding: '12px',
       display: 'flex', flexDirection: 'column', gap: '8px'

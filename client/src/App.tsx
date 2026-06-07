@@ -14,6 +14,7 @@ import { AssetPanel } from './components/AssetPanel';
 import { Minimap } from './components/Minimap';
 import { TeamSpace } from './components/TeamSpace';
 import { TimerPanel } from './components/TimerPanel';
+import { OnboardingTour } from './components/OnboardingTour';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
@@ -32,7 +33,7 @@ const App: React.FC = () => {
     isHost, followState, loadNotifications, loadUnreadCount,
     addNotification, unreadNotificationCount, showNotificationPanel,
     setShowNotificationPanel, loadAssets, showTimerPanel, setShowTimerPanel,
-    syncTimerState, syncState
+    syncTimerState, syncState, resetOnboarding
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -73,6 +74,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (currentView === 'board' && activeBoard) {
+      const hasCompletedOnboarding = localStorage.getItem('whiteboard_onboarding_completed');
+      if (!hasCompletedOnboarding) {
+        setTimeout(() => {
+          resetOnboarding();
+        }, 500);
+      }
       setBoard(activeBoard);
       loadComments(activeBoard._id);
 
@@ -669,6 +676,33 @@ const App: React.FC = () => {
           ⏱️
           计时
         </button>
+        <button
+          onClick={() => resetOnboarding()}
+          title="查看使用引导"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: '#374151',
+            background: '#f3f4f6',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#e5e7eb';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f3f4f6';
+          }}
+        >
+          ❓
+          帮助
+        </button>
         {!useWhiteboardStore.getState().isShareAccess && canEdit && (
           <button
             onClick={handleArchiveBoard}
@@ -698,38 +732,40 @@ const App: React.FC = () => {
           </button>
         )}
         {!useWhiteboardStore.getState().isShareAccess && (
-          <button
-            onClick={() => setIsShareModalOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              fontSize: '13px',
-              fontWeight: 500,
-              color: '#fff',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'opacity 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="18" cy="5" r="3" />
-              <circle cx="6" cy="12" r="3" />
-              <circle cx="18" cy="19" r="3" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-            </svg>
-            分享
-          </button>
+          <span className="collaboration-area">
+            <button
+              onClick={() => setIsShareModalOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#fff',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.9';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+              分享
+            </button>
+          </span>
         )}
       </div>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -754,6 +790,7 @@ const App: React.FC = () => {
         onBoardUpdate={handleBoardUpdate}
       />
       <NotificationPanel />
+      <OnboardingTour />
       <style>{`
         @keyframes pulse {
           0%, 100% {

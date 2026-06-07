@@ -338,3 +338,21 @@ export interface SyncState {
   lastSyncTime: number | null;
   syncError: string | null;
 }
+
+export type OnboardingStepKey = 'welcome' | 'toolbar' | 'layers' | 'collaboration' | 'canvas' | 'complete';
+
+export interface OnboardingStep {
+  key: OnboardingStepKey;
+  title: string;
+  description: string;
+  highlightSelector?: string;
+  position?: 'top' | 'bottom' | 'left' | 'right';
+  icon: string;
+}
+
+export interface OnboardingState {
+  isActive: boolean;
+  currentStepIndex: number;
+  steps: OnboardingStep[];
+  hasCompleted: boolean;
+}

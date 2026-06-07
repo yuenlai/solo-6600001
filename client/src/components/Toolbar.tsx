@@ -90,7 +90,7 @@ export const Toolbar: React.FC = () => {
   };
 
   return (
-    <div style={{
+    <div className="toolbar-container" style={{
       display: 'flex', flexDirection: 'column', gap: '8px',
       padding: '12px', background: '#fff', borderRadius: '8px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.15)', width: '60px', alignItems: 'center'
