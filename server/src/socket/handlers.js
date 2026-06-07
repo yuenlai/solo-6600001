@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { readBoards } = require('../storage');
+const { NotificationStorage } = require('../storage/notifications');
 
 const activeUsers = new Map(); // boardId -> Set of socket ids
 const cursorPositions = new Map(); // socketId -> { x, y, username, boardId, canEdit, userId }
@@ -139,6 +140,39 @@ function setupSocketHandlers(io) {
 
     socket.on('add-comment', ({ boardId, comment }) => {
       socket.to(`board:${boardId}`).emit('comment-added', { comment });
+      
+      const boards = readBoards();
+      const board = boards.find((b) => b._id === boardId);
+      if (board) {
+        const pos = cursorPositions.get(socket.id);
+        if (comment.targetId && comment.targetId !== 'canvas') {
+          const allElements = board.layers.flatMap(layer => layer.elements);
+          const element = allElements.find(el => el.id === comment.targetId);
+          if (element && element.taskData && element.taskData.assigneeId && element.taskData.assigneeId !== comment.authorId) {
+            const notification = NotificationStorage.createNotification({
+              type: 'comment',
+              boardId,
+              boardName: board.name,
+              title: `任务收到新评论`,
+              content: `${comment.author} 评论了任务「${element.taskData.title}」: ${comment.content}`,
+              fromUser: comment.author,
+              fromUserId: comment.authorId,
+              toUserId: element.taskData.assigneeId,
+              linkData: {
+                elementId: comment.targetId,
+                commentId: comment.id,
+                x: comment.x,
+                y: comment.y,
+              },
+            });
+            for (const [sid, data] of cursorPositions) {
+              if (data.userId === element.taskData.assigneeId) {
+                io.to(sid).emit('notification', notification);
+              }
+            }
+          }
+        }
+      }
     });
 
     socket.on('update-comment', ({ boardId, commentId, updates }) => {
@@ -147,6 +181,34 @@ function setupSocketHandlers(io) {
 
     socket.on('add-reply', ({ boardId, commentId, reply }) => {
       socket.to(`board:${boardId}`).emit('reply-added', { commentId, reply });
+      
+      const boards = readBoards();
+      const board = boards.find((b) => b._id === boardId);
+      if (board) {
+        const comment = (board.comments || []).find(c => c.id === commentId);
+        if (comment && comment.authorId !== reply.authorId) {
+          const notification = NotificationStorage.createNotification({
+            type: 'reply',
+            boardId,
+            boardName: board.name,
+            title: `评论收到新回复`,
+            content: `${reply.author} 回复了你: ${reply.content}`,
+            fromUser: reply.author,
+            fromUserId: reply.authorId,
+            toUserId: comment.authorId,
+            linkData: {
+              commentId,
+              x: comment.x,
+              y: comment.y,
+            },
+          });
+          for (const [sid, data] of cursorPositions) {
+            if (data.userId === comment.authorId) {
+              io.to(sid).emit('notification', notification);
+            }
+          }
+        }
+      }
     });
 
     socket.on('resolve-comment', ({ boardId, commentId, resolved }) => {
@@ -164,6 +226,31 @@ function setupSocketHandlers(io) {
         return;
       }
       socket.to(`board:${boardId}`).emit('task-card-updated', { elementId, taskData, layerIndex });
+      
+      if (taskData.assigneeId && taskData.assigneeId !== pos.userId) {
+        const boards = readBoards();
+        const board = boards.find((b) => b._id === boardId);
+        if (board) {
+          const notification = NotificationStorage.createNotification({
+            type: 'task-assign',
+            boardId,
+            boardName: board.name,
+            title: `你被分配了新任务`,
+            content: `${pos.username} 给你分配了任务: ${taskData.title || '未命名任务'}`,
+            fromUser: pos.username,
+            fromUserId: pos.userId,
+            toUserId: taskData.assigneeId,
+            linkData: {
+              elementId,
+            },
+          });
+          for (const [sid, data] of cursorPositions) {
+            if (data.userId === taskData.assigneeId) {
+              io.to(sid).emit('notification', notification);
+            }
+          }
+        }
+      }
     });
 
     socket.on('restore-snapshot', ({ boardId, layers }) => {

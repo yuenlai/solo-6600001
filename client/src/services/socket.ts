@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData, Poll, HostInfo } from '../types';
+import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData, Poll, HostInfo, Notification } from '../types';
 
 const SERVER_URL = '/';
 
@@ -285,6 +285,10 @@ class SocketService {
 
   onError(callback: (data: { message: string }) => void): void {
     this.socket?.on('error', callback);
+  }
+
+  onNotification(callback: (data: Notification) => void): void {
+    this.socket?.on('notification', callback);
   }
 
   off(event: string, callback?: (...args: unknown[]) => void): void {

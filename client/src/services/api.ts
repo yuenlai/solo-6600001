@@ -1,7 +1,8 @@
-import { Board, Template, SharePermission, ShareResult, Comment, CommentReply, Snapshot, Poll } from '../types';
+import { Board, Template, SharePermission, ShareResult, Comment, CommentReply, Snapshot, Poll, Notification } from '../types';
 
 const API_BASE_URL = '/api/boards';
 const TEMPLATE_API_URL = '/api/templates';
+const NOTIFICATION_API_URL = '/api/notifications';
 
 export const boardApi = {
   async getBoards(userId: string): Promise<Board[]> {
@@ -483,5 +484,67 @@ export const templateApi = {
       }
       throw error;
     }
+  },
+};
+
+export const notificationApi = {
+  async getNotifications(userId: string): Promise<Notification[]> {
+    const response = await fetch(`${NOTIFICATION_API_URL}/user/${userId}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch notifications');
+    }
+    return response.json();
+  },
+
+  async getUnreadCount(userId: string): Promise<{ count: number }> {
+    const response = await fetch(`${NOTIFICATION_API_URL}/user/${userId}/unread-count`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch unread count');
+    }
+    return response.json();
+  },
+
+  async markAsRead(notificationId: string): Promise<Notification> {
+    const response = await fetch(`${NOTIFICATION_API_URL}/${notificationId}/read`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to mark as read');
+    }
+    return response.json();
+  },
+
+  async markAllAsRead(userId: string): Promise<Notification[]> {
+    const response = await fetch(`${NOTIFICATION_API_URL}/user/${userId}/read-all`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to mark all as read');
+    }
+    return response.json();
+  },
+
+  async deleteNotification(notificationId: string): Promise<boolean> {
+    const response = await fetch(`${NOTIFICATION_API_URL}/${notificationId}`, {
+      method: 'DELETE',
+    });
+    return response.ok;
+  },
+
+  async createNotification(data: Omit<Notification, 'id' | 'read' | 'createdAt'>): Promise<Notification> {
+    const response = await fetch(NOTIFICATION_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create notification');
+    }
+    return response.json();
   },
 };

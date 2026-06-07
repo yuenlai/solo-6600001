@@ -9,10 +9,11 @@ import { PresentationPanel } from './components/PresentationPanel';
 import { MeetingMinutes } from './components/MeetingMinutes';
 import { SnapshotHistoryPanel } from './components/SnapshotHistoryPanel';
 import { SearchPanel } from './components/SearchPanel';
+import { NotificationPanel } from './components/NotificationPanel';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
-import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType, Comment, CommentReply } from './types';
+import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType, Comment, CommentReply, Notification } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -23,7 +24,9 @@ const App: React.FC = () => {
     board, setBoard, updateCursor, removeCursor, setCursors, username,
     canEdit, setCanEdit, setIsShareAccess, showCommentPanel, setShowCommentPanel,
     loadComments, setHostInfo, applyHostView, stopFollowingHost,
-    isHost, followState
+    isHost, followState, loadNotifications, loadUnreadCount,
+    addNotification, unreadNotificationCount, showNotificationPanel,
+    setShowNotificationPanel
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -33,6 +36,12 @@ const App: React.FC = () => {
       loadSharedBoard(token);
     }
   }, []);
+
+  useEffect(() => {
+    const userId = 'user-1';
+    loadNotifications(userId);
+    loadUnreadCount(userId);
+  }, [currentView]);
 
   const loadSharedBoard = async (token: string) => {
     try {
@@ -238,6 +247,10 @@ const App: React.FC = () => {
         console.warn('Socket error:', data.message);
       });
 
+      socketService.onNotification((notification: Notification) => {
+        addNotification(notification);
+      });
+
       return () => {
         socketService.disconnect();
       };
@@ -307,6 +320,7 @@ const App: React.FC = () => {
           board={activeBoard}
           onBoardUpdate={handleBoardUpdate}
         />
+        <NotificationPanel />
       </>
     );
   }
@@ -453,6 +467,55 @@ const App: React.FC = () => {
             ) : null;
           })()}
         </button>
+        <button
+          onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: showNotificationPanel ? '#fff' : '#374151',
+            background: showNotificationPanel ? '#f59e0b' : '#f3f4f6',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            position: 'relative',
+          }}
+          onMouseEnter={(e) => {
+            if (!showNotificationPanel) {
+              e.currentTarget.style.background = '#e5e7eb';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!showNotificationPanel) {
+              e.currentTarget.style.background = '#f3f4f6';
+            }
+          }}
+        >
+          🔔
+          通知
+          {unreadNotificationCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '-4px',
+              background: '#f44336',
+              color: '#fff',
+              borderRadius: '10px',
+              padding: '0 6px',
+              fontSize: '10px',
+              fontWeight: 600,
+              minWidth: '18px',
+              textAlign: 'center',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            }}>
+              {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+            </span>
+          )}
+        </button>
         {!useWhiteboardStore.getState().isShareAccess && (
           <button
             onClick={() => setIsShareModalOpen(true)}
@@ -506,6 +569,7 @@ const App: React.FC = () => {
         board={activeBoard}
         onBoardUpdate={handleBoardUpdate}
       />
+      <NotificationPanel />
     </div>
   );
 };

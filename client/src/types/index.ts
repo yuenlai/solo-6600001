@@ -226,3 +226,25 @@ export interface SearchResult {
   width?: number;
   height?: number;
 }
+
+export type NotificationType = 'invite' | 'comment' | 'task-assign' | 'reply';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  boardId: string;
+  boardName: string;
+  title: string;
+  content: string;
+  fromUser: string;
+  fromUserId: string;
+  toUserId: string;
+  read: boolean;
+  createdAt: string;
+  linkData?: {
+    elementId?: string;
+    commentId?: string;
+    x?: number;
+    y?: number;
+  };
+}

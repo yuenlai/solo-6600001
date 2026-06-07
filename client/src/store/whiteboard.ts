@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification } from '../types';
 import { socketService } from '../services/socket';
-import { boardApi } from '../services/api';
+import { boardApi, notificationApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
 import { exportBoardToImage, downloadImage, exportPresets } from '../utils/exportImage';
 
@@ -48,6 +48,9 @@ interface WhiteboardState {
   exportQuality: number;
   includePollsInExport: boolean;
   isExporting: boolean;
+  notifications: Notification[];
+  unreadNotificationCount: number;
+  showNotificationPanel: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -140,6 +143,15 @@ interface WhiteboardState {
   setExportQuality: (quality: number) => void;
   setIncludePollsInExport: (include: boolean) => void;
   exportBoard: () => Promise<void>;
+  setNotifications: (notifications: Notification[]) => void;
+  addNotification: (notification: Notification) => void;
+  setUnreadNotificationCount: (count: number) => void;
+  setShowNotificationPanel: (show: boolean) => void;
+  loadNotifications: (userId: string) => Promise<void>;
+  loadUnreadCount: (userId: string) => Promise<void>;
+  markNotificationAsRead: (notificationId: string) => Promise<void>;
+  markAllNotificationsAsRead: (userId: string) => Promise<void>;
+  deleteNotification: (notificationId: string) => Promise<void>;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -189,6 +201,9 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   exportQuality: 0.92,
   includePollsInExport: true,
   isExporting: false,
+  notifications: [],
+  unreadNotificationCount: 0,
+  showNotificationPanel: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -1003,6 +1018,82 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
       alert('导出图片失败，请重试');
     } finally {
       set({ isExporting: false, showExportModal: false });
+    }
+  },
+
+  setNotifications: (notifications) => set({ notifications }),
+
+  addNotification: (notification) => {
+    const { notifications } = get();
+    set({ 
+      notifications: [notification, ...notifications],
+      unreadNotificationCount: get().unreadNotificationCount + 1
+    });
+  },
+
+  setUnreadNotificationCount: (count) => set({ unreadNotificationCount: count }),
+
+  setShowNotificationPanel: (show) => set({ showNotificationPanel: show }),
+
+  loadNotifications: async (userId) => {
+    try {
+      const notifications = await notificationApi.getNotifications(userId);
+      set({ notifications });
+      const unreadCount = notifications.filter(n => !n.read).length;
+      set({ unreadNotificationCount: unreadCount });
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  },
+
+  loadUnreadCount: async (userId) => {
+    try {
+      const result = await notificationApi.getUnreadCount(userId);
+      set({ unreadNotificationCount: result.count });
+    } catch (error) {
+      console.error('Failed to load unread count:', error);
+    }
+  },
+
+  markNotificationAsRead: async (notificationId) => {
+    try {
+      const updated = await notificationApi.markAsRead(notificationId);
+      const { notifications } = get();
+      const updatedNotifications = notifications.map(n =>
+        n.id === notificationId ? updated : n
+      );
+      set({ 
+        notifications: updatedNotifications,
+        unreadNotificationCount: updatedNotifications.filter(n => !n.read).length
+      });
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  },
+
+  markAllNotificationsAsRead: async (userId) => {
+    try {
+      const updated = await notificationApi.markAllAsRead(userId);
+      set({ 
+        notifications: updated,
+        unreadNotificationCount: 0
+      });
+    } catch (error) {
+      console.error('Failed to mark all as read:', error);
+    }
+  },
+
+  deleteNotification: async (notificationId) => {
+    try {
+      await notificationApi.deleteNotification(notificationId);
+      const { notifications } = get();
+      const filtered = notifications.filter(n => n.id !== notificationId);
+      set({ 
+        notifications: filtered,
+        unreadNotificationCount: filtered.filter(n => !n.read).length
+      });
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
     }
   },
 }));

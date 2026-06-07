@@ -134,7 +134,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
   const [loading, setLoading] = useState(true);
   const [isTemplateCenterOpen, setIsTemplateCenterOpen] = useState(false);
   const [showWelcomeTip, setShowWelcomeTip] = useState(false);
-  const username = useWhiteboardStore((state) => state.username);
+  const { username, unreadNotificationCount, showNotificationPanel, setShowNotificationPanel } = useWhiteboardStore((state) => ({
+    username: state.username,
+    unreadNotificationCount: state.unreadNotificationCount,
+    showNotificationPanel: state.showNotificationPanel,
+    setShowNotificationPanel: state.setShowNotificationPanel,
+  }));
 
   const userId = 'user-1';
 
@@ -434,6 +439,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
               新建白板
+            </button>
+            <button
+              onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '36px',
+                height: '36px',
+                fontSize: '18px',
+                background: '#f3f4f6',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+                position: 'relative',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f3f4f6';
+              }}
+            >
+              🔔
+              {unreadNotificationCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    background: '#f44336',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    padding: '0 6px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    minWidth: '18px',
+                    textAlign: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </span>
+              )}
             </button>
             <div
               style={{
