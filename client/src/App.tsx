@@ -10,6 +10,7 @@ import { MeetingMinutes } from './components/MeetingMinutes';
 import { SnapshotHistoryPanel } from './components/SnapshotHistoryPanel';
 import { SearchPanel } from './components/SearchPanel';
 import { NotificationPanel } from './components/NotificationPanel';
+import { AssetPanel } from './components/AssetPanel';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
@@ -26,7 +27,7 @@ const App: React.FC = () => {
     loadComments, setHostInfo, applyHostView, stopFollowingHost,
     isHost, followState, loadNotifications, loadUnreadCount,
     addNotification, unreadNotificationCount, showNotificationPanel,
-    setShowNotificationPanel
+    setShowNotificationPanel, loadAssets
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -41,6 +42,7 @@ const App: React.FC = () => {
     const userId = 'user-1';
     loadNotifications(userId);
     loadUnreadCount(userId);
+    loadAssets();
   }, [currentView]);
 
   const loadSharedBoard = async (token: string) => {
@@ -560,6 +562,7 @@ const App: React.FC = () => {
           <MeetingMinutes />
           <SnapshotHistoryPanel />
           <SearchPanel />
+          <AssetPanel />
         </div>
         {canEdit && <LayerPanel />}
       </div>

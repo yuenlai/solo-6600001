@@ -16,7 +16,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
 ];
 
 export const Toolbar: React.FC = () => {
-  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost, showNoteGroupPanel, setShowNoteGroupPanel, showSearchPanel, setShowSearchPanel, setShowExportModal } = useWhiteboardStore();
+  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost, showNoteGroupPanel, setShowNoteGroupPanel, showSearchPanel, setShowSearchPanel, setShowExportModal, showAssetPanel, setShowAssetPanel, assets } = useWhiteboardStore();
 
   return (
     <div style={{
@@ -139,6 +139,35 @@ export const Toolbar: React.FC = () => {
         }}
       >
         📷
+      </button>
+      <button
+        onClick={() => setShowAssetPanel(!showAssetPanel)}
+        title="素材库"
+        style={{
+          width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+          background: showAssetPanel ? '#e3f2fd' : 'transparent',
+          cursor: 'pointer', fontSize: '18px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          position: 'relative'
+        }}
+      >
+        🎨
+        {assets.length > 0 && (
+          <span style={{
+            position: 'absolute',
+            top: '2px',
+            right: '2px',
+            background: '#4472C4',
+            color: '#fff',
+            fontSize: '9px',
+            padding: '1px 4px',
+            borderRadius: '8px',
+            minWidth: '16px',
+            textAlign: 'center'
+          }}>
+            {assets.length}
+          </span>
+        )}
       </button>
       <div style={{ width: '100%', height: '1px', background: '#ddd' }} />
       {canEdit && (

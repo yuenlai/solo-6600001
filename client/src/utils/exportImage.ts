@@ -186,6 +186,27 @@ function renderElement(ctx: CanvasRenderingContext2D, el: BoardElement) {
         ctx.fillText(statusLabels[el.taskData.status] || el.taskData.status, el.x + 20, el.y + (el.height || 160) - 18);
       }
       break;
+    case 'image':
+      if (el.imageSrc) {
+        const exportImageCache = (window as any).__exportImageCache || new Map();
+        (window as any).__exportImageCache = exportImageCache;
+        
+        let img = exportImageCache.get(el.imageSrc);
+        if (!img) {
+          img = new Image();
+          img.src = el.imageSrc;
+          exportImageCache.set(el.imageSrc, img);
+        }
+        if (img.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, el.x, el.y, el.width || 100, el.height || 100);
+        } else {
+          ctx.fillStyle = '#f3f4f6';
+          ctx.fillRect(el.x, el.y, el.width || 100, el.height || 100);
+          ctx.strokeStyle = '#d1d5db';
+          ctx.strokeRect(el.x, el.y, el.width || 100, el.height || 100);
+        }
+      }
+      break;
   }
   ctx.restore();
 }

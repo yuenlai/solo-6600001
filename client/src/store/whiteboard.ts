@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification, Asset } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi, notificationApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
@@ -51,6 +52,8 @@ interface WhiteboardState {
   notifications: Notification[];
   unreadNotificationCount: number;
   showNotificationPanel: boolean;
+  assets: Asset[];
+  showAssetPanel: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -152,6 +155,13 @@ interface WhiteboardState {
   markNotificationAsRead: (notificationId: string) => Promise<void>;
   markAllNotificationsAsRead: (userId: string) => Promise<void>;
   deleteNotification: (notificationId: string) => Promise<void>;
+  setShowAssetPanel: (show: boolean) => void;
+  setAssets: (assets: Asset[]) => void;
+  addAsset: (asset: Omit<Asset, 'id' | 'createdAt' | 'usageCount'>) => void;
+  deleteAsset: (assetId: string) => void;
+  updateAsset: (assetId: string, updates: Partial<Asset>) => void;
+  insertAssetToCanvas: (assetId: string, x: number, y: number) => void;
+  loadAssets: () => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -204,6 +214,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   notifications: [],
   unreadNotificationCount: 0,
   showNotificationPanel: false,
+  assets: [],
+  showAssetPanel: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -1095,5 +1107,88 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     } catch (error) {
       console.error('Failed to delete notification:', error);
     }
+  },
+
+  setShowAssetPanel: (show) => set({ showAssetPanel: show }),
+
+  setAssets: (assets) => {
+    set({ assets });
+    localStorage.setItem('whiteboard-assets', JSON.stringify(assets));
+  },
+
+  loadAssets: () => {
+    try {
+      const saved = localStorage.getItem('whiteboard-assets');
+      if (saved) {
+        const assets = JSON.parse(saved);
+        set({ assets });
+      }
+    } catch (error) {
+      console.error('Failed to load assets:', error);
+    }
+  },
+
+  addAsset: (assetData) => {
+    const { assets } = get();
+    const newAsset: Asset = {
+      ...assetData,
+      id: Math.random().toString(36).substr(2, 9),
+      createdAt: new Date().toISOString(),
+      usageCount: 0
+    };
+    const newAssets = [...assets, newAsset];
+    set({ assets: newAssets });
+    localStorage.setItem('whiteboard-assets', JSON.stringify(newAssets));
+  },
+
+  deleteAsset: (assetId) => {
+    const { assets } = get();
+    const newAssets = assets.filter(a => a.id !== assetId);
+    set({ assets: newAssets });
+    localStorage.setItem('whiteboard-assets', JSON.stringify(newAssets));
+  },
+
+  updateAsset: (assetId, updates) => {
+    const { assets } = get();
+    const newAssets = assets.map(a =>
+      a.id === assetId ? { ...a, ...updates } : a
+    );
+    set({ assets: newAssets });
+    localStorage.setItem('whiteboard-assets', JSON.stringify(newAssets));
+  },
+
+  insertAssetToCanvas: (assetId, x, y) => {
+    const { assets, addElement, updateAsset } = get();
+    const asset = assets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    const maxWidth = 300;
+    const maxHeight = 300;
+    let width = asset.width;
+    let height = asset.height;
+    if (width > maxWidth) {
+      height = (maxWidth / width) * height;
+      width = maxWidth;
+    }
+    if (height > maxHeight) {
+      width = (maxHeight / height) * width;
+      height = maxHeight;
+    }
+
+    const element: BoardElement = {
+      id: uuidv4(),
+      type: 'image',
+      x,
+      y,
+      width,
+      height,
+      imageSrc: asset.dataUrl,
+      stroke: 'transparent',
+      strokeWidth: 0,
+      fill: 'transparent'
+    };
+
+    addElement(element);
+    updateAsset(assetId, { usageCount: asset.usageCount + 1 });
   },
 }));

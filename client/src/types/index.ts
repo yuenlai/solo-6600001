@@ -32,6 +32,18 @@ export interface BoardElement {
   borderTopLeftRadius?: number;
   borderTopRightRadius?: number;
   taskData?: TaskCardData;
+  imageSrc?: string;
+}
+
+export interface Asset {
+  id: string;
+  name: string;
+  type: 'image';
+  dataUrl: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  usageCount: number;
 }
 
 export interface Layer {

@@ -11,6 +11,8 @@ import { CreatePollModal } from './CreatePollModal';
 import { NoteGroupPanel } from './NoteGroupPanel';
 import { ExportModal } from './ExportModal';
 
+const imageCache = new Map<string, HTMLImageElement>();
+
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
@@ -18,6 +20,7 @@ export const WhiteboardCanvas: React.FC = () => {
   const currentPathRef = useRef<number[]>([]);
   const startPosRef = useRef({ x: 0, y: 0 });
   const panStartRef = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
+  const [, forceUpdate] = useState({});
 
   const [addingComment, setAddingComment] = useState<{
     position: { x: number; y: number };
@@ -326,6 +329,32 @@ export const WhiteboardCanvas: React.FC = () => {
                 ctx.fillStyle = el.fill || '#000';
                 ctx.font = '16px sans-serif';
                 ctx.fillText(el.text, el.x, el.y);
+              }
+              break;
+            case 'image':
+              if (el.imageSrc) {
+                let img = imageCache.get(el.imageSrc);
+                if (!img) {
+                  img = new Image();
+                  img.src = el.imageSrc;
+                  img.onload = () => {
+                    forceUpdate({});
+                  };
+                  imageCache.set(el.imageSrc, img);
+                }
+                if (img.complete && img.naturalWidth > 0) {
+                  ctx.drawImage(img, el.x, el.y, el.width || 100, el.height || 100);
+                } else {
+                  ctx.fillStyle = '#f3f4f6';
+                  ctx.fillRect(el.x, el.y, el.width || 100, el.height || 100);
+                  ctx.strokeStyle = '#d1d5db';
+                  ctx.strokeRect(el.x, el.y, el.width || 100, el.height || 100);
+                  ctx.fillStyle = '#9ca3af';
+                  ctx.font = '12px sans-serif';
+                  ctx.textAlign = 'center';
+                  ctx.fillText('加载中...', el.x + (el.width || 100) / 2, el.y + (el.height || 100) / 2);
+                  ctx.textAlign = 'left';
+                }
               }
               break;
           }
