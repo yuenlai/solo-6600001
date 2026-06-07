@@ -3,6 +3,7 @@ import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, 
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
+import { exportBoardToImage, downloadImage, exportPresets } from '../utils/exportImage';
 
 interface WhiteboardState {
   board: Board | null;
@@ -41,6 +42,12 @@ interface WhiteboardState {
   searchQuery: string;
   searchResults: SearchResult[];
   selectedSearchResultId: string | null;
+  showExportModal: boolean;
+  exportScale: number;
+  exportFormat: 'png' | 'jpeg';
+  exportQuality: number;
+  includePollsInExport: boolean;
+  isExporting: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -127,6 +134,12 @@ interface WhiteboardState {
   setSelectedSearchResultId: (id: string | null) => void;
   performSearch: (query: string) => void;
   navigateToSearchResult: (result: SearchResult) => void;
+  setShowExportModal: (show: boolean) => void;
+  setExportScale: (scale: number) => void;
+  setExportFormat: (format: 'png' | 'jpeg') => void;
+  setExportQuality: (quality: number) => void;
+  setIncludePollsInExport: (include: boolean) => void;
+  exportBoard: () => Promise<void>;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -170,6 +183,12 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   searchQuery: '',
   searchResults: [],
   selectedSearchResultId: null,
+  showExportModal: false,
+  exportScale: exportPresets.high.scale,
+  exportFormat: 'png',
+  exportQuality: 0.92,
+  includePollsInExport: true,
+  isExporting: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -949,5 +968,41 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     });
 
     set({ selectedSearchResultId: result.id });
+  },
+
+  setShowExportModal: (show) => set({ showExportModal: show }),
+  setExportScale: (scale) => set({ exportScale: scale }),
+  setExportFormat: (format) => set({ exportFormat: format }),
+  setExportQuality: (quality) => set({ exportQuality: quality }),
+  setIncludePollsInExport: (include) => set({ includePollsInExport: include }),
+
+  exportBoard: async () => {
+    const { board, noteGroups, exportScale, exportFormat, exportQuality, includePollsInExport } = get();
+    if (!board) {
+      console.error('没有可导出的白板');
+      return;
+    }
+
+    set({ isExporting: true });
+    try {
+      const padding = exportScale >= 4 ? 60 : 40;
+      const dataUrl = await exportBoardToImage(board, noteGroups, {
+        scale: exportScale,
+        padding,
+        backgroundColor: board.backgroundColor,
+        includePolls: includePollsInExport,
+        format: exportFormat,
+        quality: exportQuality,
+      });
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `白板_${board.name}_${timestamp}.${exportFormat}`;
+      downloadImage(dataUrl, filename);
+    } catch (error) {
+      console.error('导出图片失败:', error);
+      alert('导出图片失败，请重试');
+    } finally {
+      set({ isExporting: false, showExportModal: false });
+    }
   },
 }));

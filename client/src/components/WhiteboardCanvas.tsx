@@ -9,6 +9,7 @@ import { TaskCard, TaskCardEditor } from './TaskCard';
 import { VotePoll } from './VotePoll';
 import { CreatePollModal } from './CreatePollModal';
 import { NoteGroupPanel } from './NoteGroupPanel';
+import { ExportModal } from './ExportModal';
 
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -673,6 +674,7 @@ export const WhiteboardCanvas: React.FC = () => {
           onClose={() => setAddingComment(null)}
         />
       )}
+      <ExportModal />
     </div>
   );
 };

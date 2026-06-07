@@ -16,7 +16,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
 ];
 
 export const Toolbar: React.FC = () => {
-  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost, showNoteGroupPanel, setShowNoteGroupPanel, showSearchPanel, setShowSearchPanel } = useWhiteboardStore();
+  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost, showNoteGroupPanel, setShowNoteGroupPanel, showSearchPanel, setShowSearchPanel, setShowExportModal } = useWhiteboardStore();
 
   return (
     <div style={{
@@ -127,6 +127,18 @@ export const Toolbar: React.FC = () => {
         }}
       >
         🔍
+      </button>
+      <button
+        onClick={() => setShowExportModal(true)}
+        title="导出高清长图"
+        style={{
+          width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+          background: 'transparent',
+          cursor: 'pointer', fontSize: '18px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center'
+        }}
+      >
+        📷
       </button>
       <div style={{ width: '100%', height: '1px', background: '#ddd' }} />
       {canEdit && (
