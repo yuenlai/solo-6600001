@@ -281,3 +281,28 @@ export interface Notification {
     y?: number;
   };
 }
+
+export interface TimerPhase {
+  id: string;
+  name: string;
+  description?: string;
+  duration: number;
+  color: string;
+}
+
+export interface TimerState {
+  isRunning: boolean;
+  currentPhaseIndex: number;
+  phases: TimerPhase[];
+  remainingTime: number;
+  totalDuration: number;
+  startTime: number | null;
+  pausedTime: number;
+  isPaused: boolean;
+}
+
+export interface TimerSettings {
+  soundEnabled: boolean;
+  warningThreshold: number;
+  autoNextPhase: boolean;
+}

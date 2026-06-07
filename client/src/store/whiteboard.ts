@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification, Asset } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification, Asset, TimerPhase, TimerState, TimerSettings } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi, notificationApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
@@ -55,6 +55,9 @@ interface WhiteboardState {
   assets: Asset[];
   showAssetPanel: boolean;
   showMinimap: boolean;
+  showTimerPanel: boolean;
+  timerState: TimerState;
+  timerSettings: TimerSettings;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -164,6 +167,21 @@ interface WhiteboardState {
   updateAsset: (assetId: string, updates: Partial<Asset>) => void;
   insertAssetToCanvas: (assetId: string, x: number, y: number) => void;
   loadAssets: () => void;
+  setShowTimerPanel: (show: boolean) => void;
+  setTimerState: (state: Partial<TimerState>) => void;
+  setTimerSettings: (settings: Partial<TimerSettings>) => void;
+  addTimerPhase: (phase: Omit<TimerPhase, 'id'>) => void;
+  updateTimerPhase: (phaseId: string, updates: Partial<TimerPhase>) => void;
+  deleteTimerPhase: (phaseId: string) => void;
+  reorderTimerPhases: (phases: TimerPhase[]) => void;
+  startTimer: () => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
+  resetTimer: () => void;
+  nextTimerPhase: () => void;
+  prevTimerPhase: () => void;
+  goToTimerPhase: (index: number) => void;
+  syncTimerState: (state: TimerState) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -219,6 +237,22 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   assets: [],
   showAssetPanel: false,
   showMinimap: true,
+  showTimerPanel: false,
+  timerState: {
+    isRunning: false,
+    currentPhaseIndex: 0,
+    phases: [],
+    remainingTime: 0,
+    totalDuration: 0,
+    startTime: null,
+    pausedTime: 0,
+    isPaused: false,
+  },
+  timerSettings: {
+    soundEnabled: true,
+    warningThreshold: 60,
+    autoNextPhase: true,
+  },
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -1195,5 +1229,226 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
     addElement(element);
     updateAsset(assetId, { usageCount: asset.usageCount + 1 });
+  },
+
+  setShowTimerPanel: (show) => set({ showTimerPanel: show }),
+
+  setTimerState: (state) => {
+    const { timerState } = get();
+    set({ timerState: { ...timerState, ...state } });
+  },
+
+  setTimerSettings: (settings) => {
+    const { timerSettings } = get();
+    set({ timerSettings: { ...timerSettings, ...settings } });
+  },
+
+  addTimerPhase: (phase) => {
+    const { timerState, canEdit } = get();
+    if (!canEdit) return;
+    const newPhase: TimerPhase = {
+      ...phase,
+      id: Math.random().toString(36).substr(2, 9)
+    };
+    const phases = [...timerState.phases, newPhase];
+    const totalDuration = phases.reduce((sum, p) => sum + p.duration, 0);
+    set({
+      timerState: {
+        ...timerState,
+        phases,
+        totalDuration,
+        remainingTime: timerState.currentPhaseIndex === phases.length - 1 ? newPhase.duration : timerState.remainingTime
+      }
+    });
+    socketService.updateTimerState({ ...timerState, phases, totalDuration });
+  },
+
+  updateTimerPhase: (phaseId, updates) => {
+    const { timerState, canEdit } = get();
+    if (!canEdit) return;
+    const phases = timerState.phases.map(p =>
+      p.id === phaseId ? { ...p, ...updates } : p
+    );
+    const totalDuration = phases.reduce((sum, p) => sum + p.duration, 0);
+    const currentPhase = phases[timerState.currentPhaseIndex];
+    set({
+      timerState: {
+        ...timerState,
+        phases,
+        totalDuration,
+        remainingTime: currentPhase ? currentPhase.duration : timerState.remainingTime
+      }
+    });
+    socketService.updateTimerState({ ...timerState, phases, totalDuration });
+  },
+
+  deleteTimerPhase: (phaseId) => {
+    const { timerState, canEdit } = get();
+    if (!canEdit) return;
+    const phases = timerState.phases.filter(p => p.id !== phaseId);
+    const totalDuration = phases.reduce((sum, p) => sum + p.duration, 0);
+    const newIndex = Math.min(timerState.currentPhaseIndex, Math.max(0, phases.length - 1));
+    const currentPhase = phases[newIndex];
+    set({
+      timerState: {
+        ...timerState,
+        phases,
+        totalDuration,
+        currentPhaseIndex: newIndex,
+        remainingTime: currentPhase ? currentPhase.duration : 0
+      }
+    });
+    socketService.updateTimerState({ ...timerState, phases, totalDuration, currentPhaseIndex: newIndex });
+  },
+
+  reorderTimerPhases: (phases) => {
+    const { timerState, canEdit } = get();
+    if (!canEdit) return;
+    const totalDuration = phases.reduce((sum, p) => sum + p.duration, 0);
+    set({
+      timerState: {
+        ...timerState,
+        phases,
+        totalDuration
+      }
+    });
+    socketService.updateTimerState({ ...timerState, phases, totalDuration });
+  },
+
+  startTimer: () => {
+    const { timerState, canEdit } = get();
+    if (!canEdit || timerState.phases.length === 0) return;
+    
+    const currentPhase = timerState.phases[timerState.currentPhaseIndex];
+    const now = Date.now();
+    const startTime = timerState.isPaused ? now - (currentPhase.duration - timerState.remainingTime) * 1000 : now;
+    
+    const newState = {
+      ...timerState,
+      isRunning: true,
+      isPaused: false,
+      startTime,
+      remainingTime: timerState.isPaused ? timerState.remainingTime : currentPhase.duration
+    };
+    
+    set({ timerState: newState });
+    socketService.startTimer(newState);
+  },
+
+  pauseTimer: () => {
+    const { timerState, canEdit } = get();
+    if (!canEdit || !timerState.isRunning) return;
+    
+    const newState = {
+      ...timerState,
+      isRunning: false,
+      isPaused: true
+    };
+    
+    set({ timerState: newState });
+    socketService.pauseTimer(newState);
+  },
+
+  resumeTimer: () => {
+    const { timerState, canEdit } = get();
+    if (!canEdit || !timerState.isPaused) return;
+    
+    const currentPhase = timerState.phases[timerState.currentPhaseIndex];
+    const now = Date.now();
+    const startTime = now - (currentPhase.duration - timerState.remainingTime) * 1000;
+    
+    const newState = {
+      ...timerState,
+      isRunning: true,
+      isPaused: false,
+      startTime
+    };
+    
+    set({ timerState: newState });
+    socketService.resumeTimer(newState);
+  },
+
+  resetTimer: () => {
+    const { timerState, canEdit } = get();
+    if (!canEdit) return;
+    
+    const firstPhase = timerState.phases[0];
+    const newState = {
+      ...timerState,
+      isRunning: false,
+      isPaused: false,
+      currentPhaseIndex: 0,
+      startTime: null,
+      remainingTime: firstPhase ? firstPhase.duration : 0
+    };
+    
+    set({ timerState: newState });
+    socketService.resetTimer(newState);
+  },
+
+  nextTimerPhase: () => {
+    const { timerState, canEdit } = get();
+    if (!canEdit) return;
+    
+    const nextIndex = timerState.currentPhaseIndex + 1;
+    if (nextIndex >= timerState.phases.length) {
+      const newState = {
+        ...timerState,
+        isRunning: false,
+        isPaused: false,
+        startTime: null
+      };
+      set({ timerState: newState });
+      socketService.timerComplete(newState);
+      return;
+    }
+    
+    const nextPhase = timerState.phases[nextIndex];
+    const newState = {
+      ...timerState,
+      currentPhaseIndex: nextIndex,
+      remainingTime: nextPhase.duration,
+      startTime: timerState.isRunning ? Date.now() : null
+    };
+    
+    set({ timerState: newState });
+    socketService.nextTimerPhase(newState);
+  },
+
+  prevTimerPhase: () => {
+    const { timerState, canEdit } = get();
+    if (!canEdit) return;
+    
+    const prevIndex = Math.max(0, timerState.currentPhaseIndex - 1);
+    const prevPhase = timerState.phases[prevIndex];
+    const newState = {
+      ...timerState,
+      currentPhaseIndex: prevIndex,
+      remainingTime: prevPhase.duration,
+      startTime: timerState.isRunning ? Date.now() : null
+    };
+    
+    set({ timerState: newState });
+    socketService.prevTimerPhase(newState);
+  },
+
+  goToTimerPhase: (index) => {
+    const { timerState, canEdit } = get();
+    if (!canEdit || index < 0 || index >= timerState.phases.length) return;
+    
+    const phase = timerState.phases[index];
+    const newState = {
+      ...timerState,
+      currentPhaseIndex: index,
+      remainingTime: phase.duration,
+      startTime: timerState.isRunning ? Date.now() : null
+    };
+    
+    set({ timerState: newState });
+    socketService.goToTimerPhase(newState);
+  },
+
+  syncTimerState: (state) => {
+    set({ timerState: state });
   },
 }));

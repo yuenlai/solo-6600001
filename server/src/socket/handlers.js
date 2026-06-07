@@ -5,6 +5,7 @@ const { NotificationStorage } = require('../storage/notifications');
 const activeUsers = new Map(); // boardId -> Set of socket ids
 const cursorPositions = new Map(); // socketId -> { x, y, username, boardId, canEdit, userId }
 const boardHosts = new Map(); // boardId -> { socketId, userId, username, canvasTransform, lastUpdatedAt }
+const boardTimers = new Map(); // boardId -> TimerState
 
 const canUserEdit = (board, userId, isShareAccess) => {
   if (!board) return false;
@@ -64,6 +65,11 @@ function setupSocketHandlers(io) {
         });
       } else {
         socket.emit('host-updated', null);
+      }
+      
+      const currentTimer = boardTimers.get(boardId);
+      if (currentTimer) {
+        socket.emit('timer-state-updated', currentTimer);
       }
     });
 
@@ -330,6 +336,69 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('stop-following-host', ({ boardId }) => {
+    });
+
+    socket.on('timer-state-update', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-state-updated', state);
+    });
+
+    socket.on('timer-start', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-started', state);
+    });
+
+    socket.on('timer-pause', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-paused', state);
+    });
+
+    socket.on('timer-resume', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-resumed', state);
+    });
+
+    socket.on('timer-reset', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-reset', state);
+    });
+
+    socket.on('timer-next-phase', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-next-phase', state);
+    });
+
+    socket.on('timer-prev-phase', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-prev-phase', state);
+    });
+
+    socket.on('timer-goto-phase', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-goto-phase', state);
+    });
+
+    socket.on('timer-complete', ({ boardId, state }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) return;
+      boardTimers.set(boardId, state);
+      socket.to(`board:${boardId}`).emit('timer-complete', state);
     });
 
     socket.on('disconnect', () => {

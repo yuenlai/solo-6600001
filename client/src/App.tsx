@@ -13,10 +13,11 @@ import { NotificationPanel } from './components/NotificationPanel';
 import { AssetPanel } from './components/AssetPanel';
 import { Minimap } from './components/Minimap';
 import { TeamSpace } from './components/TeamSpace';
+import { TimerPanel } from './components/TimerPanel';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
-import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType, Comment, CommentReply, Notification } from './types';
+import { Board, BoardElement, CursorPosition, Layer, CanvasTransform, ViewType, Comment, CommentReply, Notification, TimerState } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -30,7 +31,8 @@ const App: React.FC = () => {
     loadComments, setHostInfo, applyHostView, stopFollowingHost,
     isHost, followState, loadNotifications, loadUnreadCount,
     addNotification, unreadNotificationCount, showNotificationPanel,
-    setShowNotificationPanel, loadAssets
+    setShowNotificationPanel, loadAssets, showTimerPanel, setShowTimerPanel,
+    syncTimerState
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -254,6 +256,34 @@ const App: React.FC = () => {
 
       socketService.onNotification((notification: Notification) => {
         addNotification(notification);
+      });
+
+      socketService.onTimerStateUpdated((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerStarted((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerPaused((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerResumed((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerReset((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerNextPhase((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerPrevPhase((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerGotoPhase((state: TimerState) => {
+        syncTimerState(state);
+      });
+      socketService.onTimerComplete((state: TimerState) => {
+        syncTimerState(state);
       });
 
       return () => {
@@ -546,6 +576,36 @@ const App: React.FC = () => {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setShowTimerPanel(!showTimerPanel)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: showTimerPanel ? '#fff' : '#374151',
+            background: showTimerPanel ? '#667eea' : '#f3f4f6',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (!showTimerPanel) {
+              e.currentTarget.style.background = '#e5e7eb';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!showTimerPanel) {
+              e.currentTarget.style.background = '#f3f4f6';
+            }
+          }}
+        >
+          ⏱️
+          计时
+        </button>
         {!useWhiteboardStore.getState().isShareAccess && (
           <button
             onClick={() => setIsShareModalOpen(true)}
@@ -592,6 +652,7 @@ const App: React.FC = () => {
           <SearchPanel />
           <AssetPanel />
           <Minimap />
+          <TimerPanel />
         </div>
         {canEdit && <LayerPanel />}
       </div>

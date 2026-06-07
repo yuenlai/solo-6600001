@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData, Poll, HostInfo, Notification } from '../types';
+import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData, Poll, HostInfo, Notification, TimerState } from '../types';
 
 const SERVER_URL = '/';
 
@@ -297,6 +297,96 @@ class SocketService {
 
   getSocket(): Socket | null {
     return this.socket;
+  }
+
+  updateTimerState(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-state-update', { boardId: this.boardId, state });
+    }
+  }
+
+  startTimer(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-start', { boardId: this.boardId, state });
+    }
+  }
+
+  pauseTimer(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-pause', { boardId: this.boardId, state });
+    }
+  }
+
+  resumeTimer(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-resume', { boardId: this.boardId, state });
+    }
+  }
+
+  resetTimer(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-reset', { boardId: this.boardId, state });
+    }
+  }
+
+  nextTimerPhase(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-next-phase', { boardId: this.boardId, state });
+    }
+  }
+
+  prevTimerPhase(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-prev-phase', { boardId: this.boardId, state });
+    }
+  }
+
+  goToTimerPhase(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-goto-phase', { boardId: this.boardId, state });
+    }
+  }
+
+  timerComplete(state: TimerState): void {
+    if (this.boardId) {
+      this.socket?.emit('timer-complete', { boardId: this.boardId, state });
+    }
+  }
+
+  onTimerStateUpdated(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-state-updated', callback);
+  }
+
+  onTimerStarted(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-started', callback);
+  }
+
+  onTimerPaused(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-paused', callback);
+  }
+
+  onTimerResumed(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-resumed', callback);
+  }
+
+  onTimerReset(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-reset', callback);
+  }
+
+  onTimerNextPhase(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-next-phase', callback);
+  }
+
+  onTimerPrevPhase(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-prev-phase', callback);
+  }
+
+  onTimerGotoPhase(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-goto-phase', callback);
+  }
+
+  onTimerComplete(callback: (state: TimerState) => void): void {
+    this.socket?.on('timer-complete', callback);
   }
 }
 
