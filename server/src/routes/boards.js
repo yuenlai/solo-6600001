@@ -6,11 +6,16 @@ const Board = require('../models/Board');
 router.get('/', async (req, res) => {
   try {
     const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
     const boards = await Board.find({
       $or: [{ ownerId: userId }, { collaborators: userId }]
     }).sort({ updatedAt: -1 });
+    console.log(`[Boards] Fetched ${boards.length} boards for user ${userId}`);
     res.json(boards);
   } catch (err) {
+    console.error('[Boards] Error fetching boards:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -30,17 +35,37 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name, ownerId, width, height, backgroundColor, layers } = req.body;
-    const board = new Board({
+
+    if (!ownerId) {
+      return res.status(400).json({ error: 'ownerId is required' });
+    }
+
+    const boardData = {
       name: name || 'Untitled Board',
       ownerId,
       width: width || 3000,
       height: height || 2000,
       backgroundColor: backgroundColor || '#ffffff',
-      layers: layers || [{ name: 'Layer 1', visible: true, locked: false, order: 0, elements: [] }]
-    });
-    await board.save();
-    res.status(201).json(board);
+    };
+
+    if (layers && Array.isArray(layers)) {
+      boardData.layers = layers.map((layer) => ({
+        name: layer.name,
+        visible: layer.visible,
+        locked: layer.locked,
+        order: layer.order,
+        elements: layer.elements,
+      }));
+    } else {
+      boardData.layers = [{ name: 'Layer 1', visible: true, locked: false, order: 0, elements: [] }];
+    }
+
+    const board = new Board(boardData);
+    const savedBoard = await board.save();
+    console.log(`[Boards] Created board: ${savedBoard._id}, name: ${savedBoard.name}, layers: ${savedBoard.layers.length}`);
+    res.status(201).json(savedBoard);
   } catch (err) {
+    console.error('[Boards] Error creating board:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -130,7 +130,8 @@ const BoardCard: React.FC<{
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
-  const [boards, setBoards] = useState<Board[]>(boardApi.getMockBoards());
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isTemplateCenterOpen, setIsTemplateCenterOpen] = useState(false);
   const username = useWhiteboardStore((state) => state.username);
 
@@ -142,22 +143,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
 
   const loadBoards = async () => {
     try {
+      setLoading(true);
       const data = await boardApi.getBoards(userId);
       setBoards(data);
     } catch (error) {
+      console.error('Failed to load boards:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleCreateBoard = async (name: string, templateId?: string) => {
-    let newBoard: Board | null = null;
-    if (templateId) {
-      newBoard = await templateApi.createBoardFromTemplate(templateId, { name, ownerId: userId });
-    } else {
-      newBoard = await boardApi.createBoard({ name, ownerId: userId });
-    }
-    if (newBoard) {
-      setBoards((prev) => [newBoard, ...prev]);
-      onBoardSelect(newBoard);
+    try {
+      let newBoard: Board | null = null;
+      if (templateId) {
+        newBoard = await templateApi.createBoardFromTemplate(templateId, { name, ownerId: userId });
+      } else {
+        newBoard = await boardApi.createBoard({ name, ownerId: userId });
+      }
+      if (newBoard) {
+        await loadBoards();
+        onBoardSelect(newBoard);
+      } else {
+        throw new Error('Failed to create board');
+      }
+    } catch (error) {
+      console.error('Failed to create board:', error);
+      alert('创建白板失败，请重试');
     }
   };
 
@@ -202,7 +214,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
     </div>
   );
 
-  const BoardGrid: React.FC<{ boards: Board[] }> = ({ boards: boardList }) => {
+  const BoardGrid: React.FC<{ boards: Board[]; loading?: boolean }> = ({ boards: boardList, loading }) => {
+    if (loading) {
+      return (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '20px',
+          }}
+        >
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              style={{
+                borderRadius: '12px',
+                height: '200px',
+                background: '#e5e7eb',
+                animation: 'pulse 1.5s ease-in-out infinite',
+              }}
+            />
+          ))}
+        </div>
+      );
+    }
+
     if (boardList.length === 0) {
       return (
         <div
@@ -224,6 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
           </svg>
           <p style={{ margin: 0, fontSize: '14px' }}>暂无白板</p>
+          <p style={{ margin: '8px 0 0', fontSize: '13px' }}>点击「新建白板」开始创建</p>
         </div>
       );
     }
@@ -418,18 +455,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
         </div>
 
         <section style={{ marginBottom: '40px' }}>
-          <SectionHeader title="最近编辑" count={recentBoards.length} />
-          <BoardGrid boards={recentBoards.slice(0, 8)} />
+          <SectionHeader title="最近编辑" count={loading ? undefined : recentBoards.length} />
+          <BoardGrid boards={recentBoards.slice(0, 8)} loading={loading && boards.length === 0} />
         </section>
 
         <section style={{ marginBottom: '40px' }}>
-          <SectionHeader title="我创建的" count={myBoards.length} />
-          <BoardGrid boards={myBoards} />
+          <SectionHeader title="我创建的" count={loading ? undefined : myBoards.length} />
+          <BoardGrid boards={myBoards} loading={loading && boards.length === 0} />
         </section>
 
         <section>
-          <SectionHeader title="我参与的" count={sharedBoards.length} />
-          <BoardGrid boards={sharedBoards} />
+          <SectionHeader title="我参与的" count={loading ? undefined : sharedBoards.length} />
+          <BoardGrid boards={sharedBoards} loading={loading && boards.length === 0} />
         </section>
       </main>
 

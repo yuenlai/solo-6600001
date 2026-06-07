@@ -13,21 +13,27 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       loadTemplates();
       setSelectedTemplate(null);
       setName('');
+      setError(null);
     }
   }, [isOpen]);
 
   const loadTemplates = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await templateApi.getTemplates();
       setTemplates(data);
     } catch (error) {
+      console.error('Failed to load templates:', error);
+      setError('加载模板失败，请刷新重试');
     } finally {
       setLoading(false);
     }
@@ -35,23 +41,47 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creating) return;
+
     const boardName = name.trim() || (selectedTemplate
       ? templates.find((t) => t._id === selectedTemplate)?.name || '未命名白板'
       : '未命名白板');
-    onCreate(boardName, selectedTemplate || undefined);
-    setName('');
-    setSelectedTemplate(null);
-    onClose();
+
+    try {
+      setCreating(true);
+      setError(null);
+      await onCreate(boardName, selectedTemplate || undefined);
+      setName('');
+      setSelectedTemplate(null);
+      onClose();
+    } catch (error) {
+      console.error('Failed to create board:', error);
+      setError('创建白板失败，请重试');
+    } finally {
+      setCreating(false);
+    }
   };
 
-  const handleCreateBlank = () => {
+  const handleCreateBlank = async () => {
+    if (creating) return;
+
     const boardName = name.trim() || '未命名白板';
-    onCreate(boardName, undefined);
-    setName('');
-    setSelectedTemplate(null);
-    onClose();
+
+    try {
+      setCreating(true);
+      setError(null);
+      await onCreate(boardName, undefined);
+      setName('');
+      setSelectedTemplate(null);
+      onClose();
+    } catch (error) {
+      console.error('Failed to create board:', error);
+      setError('创建白板失败，请重试');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const TemplateCard: React.FC<{
@@ -469,82 +499,142 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
             style={{
               padding: '20px 32px',
               borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
               background: '#f9fafb',
             }}
           >
-            <div style={{ fontSize: '13px', color: '#6b7280' }}>
-              {selectedTemplate
-                ? `已选择：${templates.find((t) => t._id === selectedTemplate)?.name}`
-                : '已选择：空白白板'}
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={onClose}
+            {error && (
+              <div
                 style={{
-                  padding: '10px 20px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: '#374151',
-                  background: '#e5e7eb',
-                  border: 'none',
+                  padding: '10px 14px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
                   borderRadius: '8px',
-                  cursor: 'pointer',
+                  color: '#dc2626',
+                  fontSize: '13px',
+                  marginBottom: '12px',
                 }}
               >
-                取消
-              </button>
-              {selectedTemplate === null ? (
+                {error}
+              </div>
+            )}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                {selectedTemplate
+                  ? `已选择：${templates.find((t) => t._id === selectedTemplate)?.name}`
+                  : '已选择：空白白板'}
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <button
                   type="button"
-                  onClick={handleCreateBlank}
+                  onClick={onClose}
+                  disabled={creating}
                   style={{
-                    padding: '10px 24px',
+                    padding: '10px 20px',
                     fontSize: '14px',
                     fontWeight: 500,
-                    color: '#fff',
-                    background: '#667eea',
+                    color: '#374151',
+                    background: '#e5e7eb',
                     border: 'none',
                     borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#5a67d8';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#667eea';
+                    cursor: creating ? 'not-allowed' : 'pointer',
+                    opacity: creating ? 0.5 : 1,
                   }}
                 >
-                  创建空白白板
+                  取消
                 </button>
-              ) : (
-                <button
-                  type="submit"
-                  style={{
-                    padding: '10px 24px',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: '#fff',
-                    background: '#667eea',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#5a67d8';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#667eea';
-                  }}
-                >
-                  使用模板创建
-                </button>
-              )}
+                {selectedTemplate === null ? (
+                  <button
+                    type="button"
+                    onClick={handleCreateBlank}
+                    disabled={creating}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      color: '#fff',
+                      background: '#667eea',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: creating ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.2s',
+                      opacity: creating ? 0.8 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!creating) e.currentTarget.style.background = '#5a67d8';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!creating) e.currentTarget.style.background = '#667eea';
+                    }}
+                  >
+                    {creating && (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        style={{ animation: 'spin 1s linear infinite' }}
+                      >
+                        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                        <path d="M4 12a8 8 0 018-8" />
+                      </svg>
+                    )}
+                    {creating ? '创建中...' : '创建空白白板'}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      color: '#fff',
+                      background: '#667eea',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: creating ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.2s',
+                      opacity: creating ? 0.8 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!creating) e.currentTarget.style.background = '#5a67d8';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!creating) e.currentTarget.style.background = '#667eea';
+                    }}
+                  >
+                    {creating && (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        style={{ animation: 'spin 1s linear infinite' }}
+                      >
+                        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                        <path d="M4 12a8 8 0 018-8" />
+                      </svg>
+                    )}
+                    {creating ? '创建中...' : '使用模板创建'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </form>
@@ -554,6 +644,10 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

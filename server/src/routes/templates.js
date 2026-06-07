@@ -44,18 +44,31 @@ router.post('/:id/create', async (req, res) => {
       return res.status(404).json({ error: 'Template not found' });
     }
 
-    const board = new Board({
+    if (!ownerId) {
+      return res.status(400).json({ error: 'ownerId is required' });
+    }
+
+    const boardData = {
       name: name || template.name,
       ownerId,
       width: template.width,
       height: template.height,
       backgroundColor: template.backgroundColor,
-      layers: template.layers,
-    });
+      layers: template.layers.map((layer) => ({
+        name: layer.name,
+        visible: layer.visible,
+        locked: layer.locked,
+        order: layer.order,
+        elements: layer.elements,
+      })),
+    };
 
-    await board.save();
-    res.status(201).json(board);
+    const board = new Board(boardData);
+    const savedBoard = await board.save();
+    console.log(`[Template] Created board from template: ${savedBoard._id}, name: ${savedBoard.name}, layers: ${savedBoard.layers.length}`);
+    res.status(201).json(savedBoard);
   } catch (err) {
+    console.error('[Template] Error creating board from template:', err);
     res.status(500).json({ error: err.message });
   }
 });

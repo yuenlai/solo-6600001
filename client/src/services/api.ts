@@ -5,46 +5,40 @@ const TEMPLATE_API_URL = '/api/templates';
 
 export const boardApi = {
   async getBoards(userId: string): Promise<Board[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}?userId=${userId}`);
-      if (!response.ok) throw new Error('Failed to fetch boards');
-      return response.json();
-    } catch (error) {
-      return this.getMockBoards();
+    const response = await fetch(`${API_BASE_URL}?userId=${userId}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch boards');
     }
+    return response.json();
   },
 
   async getBoard(boardId: string): Promise<Board | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${boardId}`);
-      if (!response.ok) throw new Error('Failed to fetch board');
-      return response.json();
-    } catch (error) {
-      return null;
+    const response = await fetch(`${API_BASE_URL}/${boardId}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch board');
     }
+    return response.json();
   },
 
   async createBoard(data: { name: string; ownerId: string; width?: number; height?: number }): Promise<Board | null> {
-    try {
-      const response = await fetch(API_BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create board');
-      return response.json();
-    } catch (error) {
-      return this.createMockBoard(data);
+    const response = await fetch(API_BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create board');
     }
+    return response.json();
   },
 
   async deleteBoard(boardId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${boardId}`, { method: 'DELETE' });
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
+    const response = await fetch(`${API_BASE_URL}/${boardId}`, { method: 'DELETE' });
+    return response.ok;
   },
 
   getMockBoards(): Board[] {
@@ -179,43 +173,37 @@ const createMockBoardFromTemplate = (
 
 export const templateApi = {
   async getTemplates(): Promise<Template[]> {
-    try {
-      const response = await fetch(TEMPLATE_API_URL);
-      if (!response.ok) throw new Error('Failed to fetch templates');
-      return response.json();
-    } catch (error) {
-      return mockTemplates;
+    const response = await fetch(TEMPLATE_API_URL);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch templates');
     }
+    return response.json();
   },
 
   async getTemplate(templateId: string): Promise<Template | null> {
-    try {
-      const response = await fetch(`${TEMPLATE_API_URL}/${templateId}`);
-      if (!response.ok) throw new Error('Failed to fetch template');
-      return response.json();
-    } catch (error) {
-      return mockTemplates.find((t) => t._id === templateId) || null;
+    const response = await fetch(`${TEMPLATE_API_URL}/${templateId}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch template');
     }
+    return response.json();
   },
 
   async createBoardFromTemplate(
     templateId: string,
     data: { name: string; ownerId: string }
   ): Promise<Board | null> {
-    try {
-      const response = await fetch(`${TEMPLATE_API_URL}/${templateId}/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create board from template');
-      return response.json();
-    } catch (error) {
-      const template = mockTemplates.find((t) => t._id === templateId);
-      if (template) {
-        return createMockBoardFromTemplate(template, data);
-      }
-      return null;
+    const response = await fetch(`${TEMPLATE_API_URL}/${templateId}/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create board from template');
     }
+    return response.json();
   },
 };
