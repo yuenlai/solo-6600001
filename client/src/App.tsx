@@ -6,6 +6,7 @@ import { CursorOverlay } from './components/CursorOverlay';
 import { Dashboard } from './components/Dashboard';
 import { ShareModal } from './components/ShareModal';
 import { PresentationPanel } from './components/PresentationPanel';
+import { MeetingMinutes } from './components/MeetingMinutes';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
@@ -374,6 +375,7 @@ const App: React.FC = () => {
           <WhiteboardCanvas />
           <CursorOverlay />
           <PresentationPanel />
+          <MeetingMinutes />
         </div>
         {canEdit && <LayerPanel />}
       </div>

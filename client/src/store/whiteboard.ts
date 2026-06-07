@@ -22,6 +22,7 @@ interface WhiteboardState {
   currentPresentationStepIndex: number;
   isPresentationPlaying: boolean;
   showPresentationPanel: boolean;
+  showMeetingMinutes: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -63,6 +64,7 @@ interface WhiteboardState {
   setShowPresentationPanel: (show: boolean) => void;
   goToNextPresentationStep: () => void;
   goToPrevPresentationStep: () => void;
+  setShowMeetingMinutes: (show: boolean) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -84,6 +86,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   currentPresentationStepIndex: 0,
   isPresentationPlaying: false,
   showPresentationPanel: false,
+  showMeetingMinutes: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -390,4 +393,6 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
       setCurrentPresentationStepIndex(currentPresentationStepIndex - 1);
     }
   },
+
+  setShowMeetingMinutes: (show) => set({ showMeetingMinutes: show }),
 }));

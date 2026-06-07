@@ -118,3 +118,16 @@ export interface Template {
   backgroundColor: string;
   layers?: Layer[];
 }
+
+export interface MeetingMinutesContent {
+  title: string;
+  date: string;
+  texts: string[];
+  stickyNotes: { content: string; color?: string }[];
+  comments: { author: string; content: string; createdAt: string; replies: { author: string; content: string; createdAt: string }[] }[];
+}
+
+export interface MeetingMinutes {
+  content: string;
+  generatedAt: string;
+}
