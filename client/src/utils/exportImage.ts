@@ -17,7 +17,49 @@ interface BoundingBox {
   maxY: number;
 }
 
+function measureTextWidth(ctx: CanvasRenderingContext2D, text: string, fontSize: number = 16): number {
+  ctx.save();
+  ctx.font = `${fontSize}px sans-serif`;
+  const width = ctx.measureText(text).width;
+  ctx.restore();
+  return width;
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  const paragraphs = text.split('\n');
+  
+  paragraphs.forEach((paragraph) => {
+    if (paragraph === '') {
+      lines.push('');
+      return;
+    }
+    
+    const words = paragraph.split('');
+    let currentLine = '';
+    
+    for (let i = 0; i < words.length; i++) {
+      const testLine = currentLine + words[i];
+      const testWidth = ctx.measureText(testLine).width;
+      
+      if (testWidth > maxWidth && currentLine !== '') {
+        lines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = testLine;
+      }
+    }
+    
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+  });
+  
+  return lines;
+}
+
 function calculateBoundingBox(
+  ctx: CanvasRenderingContext2D,
   elements: BoardElement[],
   noteGroups: NoteGroup[],
   polls: Poll[],
@@ -49,10 +91,27 @@ function calculateBoundingBox(
       maxX = Math.max(maxX, el.x + rx);
       maxY = Math.max(maxY, el.y + ry);
     } else if (el.type === 'text') {
+      const fontSize = el.fontSize || 16;
+      const textWidth = el.text ? measureTextWidth(ctx, el.text, fontSize) : 100;
       minX = Math.min(minX, el.x);
-      minY = Math.min(minY, el.y - 30);
-      maxX = Math.max(maxX, el.x + 200);
-      maxY = Math.max(maxY, el.y + 10);
+      minY = Math.min(minY, el.y - fontSize);
+      maxX = Math.max(maxX, el.x + textWidth);
+      maxY = Math.max(maxY, el.y + 4);
+    } else if (el.type === 'sticky-note') {
+      minX = Math.min(minX, el.x);
+      minY = Math.min(minY, el.y);
+      maxX = Math.max(maxX, el.x + (el.width || 160));
+      maxY = Math.max(maxY, el.y + (el.height || 120));
+    } else if (el.type === 'task-card') {
+      minX = Math.min(minX, el.x);
+      minY = Math.min(minY, el.y);
+      maxX = Math.max(maxX, el.x + (el.width || 240));
+      maxY = Math.max(maxY, el.y + (el.height || 160));
+    } else if (el.type === 'image') {
+      minX = Math.min(minX, el.x);
+      minY = Math.min(minY, el.y);
+      maxX = Math.max(maxX, el.x + (el.width || 100));
+      maxY = Math.max(maxY, el.y + (el.height || 100));
     } else {
       minX = Math.min(minX, el.x);
       minY = Math.min(minY, el.y);
@@ -65,14 +124,16 @@ function calculateBoundingBox(
     minX = Math.min(minX, group.x);
     minY = Math.min(minY, group.y);
     maxX = Math.max(maxX, group.x + group.width);
-    maxY = Math.max(maxY, group.y + group.height);
+    maxY = Math.max(maxY, group.y + (group.collapsed ? 50 : group.height));
   });
 
   polls.forEach((poll) => {
+    const cardWidth = 280;
+    const cardHeight = 120 + poll.options.length * 36;
     minX = Math.min(minX, poll.x);
     minY = Math.min(minY, poll.y);
-    maxX = Math.max(maxX, poll.x + 300);
-    maxY = Math.max(maxY, poll.y + 200);
+    maxX = Math.max(maxX, poll.x + cardWidth);
+    maxY = Math.max(maxY, poll.y + cardHeight);
   });
 
   if (minX === Infinity) {
@@ -90,8 +151,18 @@ function calculateBoundingBox(
   };
 }
 
+function setupContextQuality(ctx: CanvasRenderingContext2D) {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.textBaseline = 'alphabetic';
+}
+
 function renderElement(ctx: CanvasRenderingContext2D, el: BoardElement) {
   ctx.save();
+  setupContextQuality(ctx);
+  
   ctx.globalAlpha = el.opacity ?? 1;
   ctx.strokeStyle = el.stroke || '#000';
   ctx.fillStyle = el.fill || 'transparent';
@@ -132,13 +203,16 @@ function renderElement(ctx: CanvasRenderingContext2D, el: BoardElement) {
       ctx.fillStyle = el.fill || '#FFF59D';
       ctx.fillRect(el.x, el.y, el.width || 160, el.height || 120);
       ctx.strokeStyle = el.stroke || '#F9A825';
+      ctx.lineWidth = 1;
       ctx.strokeRect(el.x, el.y, el.width || 160, el.height || 120);
       if (el.text) {
         ctx.fillStyle = '#333';
         ctx.font = '14px sans-serif';
-        const lines = el.text.split('\n');
-        lines.forEach((line, index) => {
-          ctx.fillText(line, el.x + 10, el.y + 30 + index * 20);
+        const maxWidth = (el.width || 160) - 20;
+        const lines = wrapText(ctx, el.text, maxWidth);
+        const lineHeight = 20;
+        lines.slice(0, 5).forEach((line, index) => {
+          ctx.fillText(line, el.x + 10, el.y + 30 + index * lineHeight);
         });
       }
       break;
@@ -158,11 +232,15 @@ function renderElement(ctx: CanvasRenderingContext2D, el: BoardElement) {
       if (el.taskData) {
         ctx.fillStyle = '#374151';
         ctx.font = 'bold 14px sans-serif';
-        ctx.fillText(el.taskData.title || '新任务', el.x + 12, el.y + 28);
+        const titleMaxWidth = (el.width || 240) - 24;
+        const titleLines = wrapText(ctx, el.taskData.title || '新任务', titleMaxWidth);
+        ctx.fillText(titleLines[0] || '新任务', el.x + 12, el.y + 28);
+        
         if (el.taskData.description) {
           ctx.fillStyle = '#6b7280';
           ctx.font = '12px sans-serif';
-          const descLines = el.taskData.description.substring(0, 60).split('\n');
+          const descMaxWidth = (el.width || 240) - 24;
+          const descLines = wrapText(ctx, el.taskData.description, descMaxWidth);
           descLines.slice(0, 3).forEach((line, index) => {
             ctx.fillText(line, el.x + 12, el.y + 50 + index * 18);
           });
@@ -195,6 +273,7 @@ function renderElement(ctx: CanvasRenderingContext2D, el: BoardElement) {
         if (!img) {
           img = new Image();
           img.src = el.imageSrc;
+          img.crossOrigin = 'anonymous';
           exportImageCache.set(el.imageSrc, img);
         }
         if (img.complete && img.naturalWidth > 0) {
@@ -213,6 +292,8 @@ function renderElement(ctx: CanvasRenderingContext2D, el: BoardElement) {
 
 function renderNoteGroup(ctx: CanvasRenderingContext2D, group: NoteGroup) {
   ctx.save();
+  setupContextQuality(ctx);
+  
   ctx.fillStyle = group.color;
   ctx.strokeStyle = 'rgba(0,0,0,0.1)';
   ctx.lineWidth = 2;
@@ -233,6 +314,8 @@ function renderNoteGroup(ctx: CanvasRenderingContext2D, group: NoteGroup) {
 
 function renderPoll(ctx: CanvasRenderingContext2D, poll: Poll) {
   ctx.save();
+  setupContextQuality(ctx);
+  
   const cardWidth = 280;
   const cardHeight = 120 + poll.options.length * 36;
 
@@ -277,6 +360,34 @@ function renderPoll(ctx: CanvasRenderingContext2D, poll: Poll) {
   ctx.restore();
 }
 
+async function preloadImages(elements: BoardElement[]): Promise<void> {
+  const imageElements = elements.filter(el => el.type === 'image' && el.imageSrc);
+  
+  const loadPromises = imageElements.map((el) => {
+    return new Promise<void>((resolve) => {
+      const exportImageCache = (window as any).__exportImageCache || new Map();
+      (window as any).__exportImageCache = exportImageCache;
+      
+      let img = exportImageCache.get(el.imageSrc);
+      if (!img) {
+        img = new Image();
+        img.src = el.imageSrc;
+        img.crossOrigin = 'anonymous';
+        exportImageCache.set(el.imageSrc, img);
+      }
+      
+      if (img.complete && img.naturalWidth > 0) {
+        resolve();
+      } else {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+      }
+    });
+  });
+  
+  await Promise.all(loadPromises);
+}
+
 export async function exportBoardToImage(
   board: Board,
   noteGroups: NoteGroup[],
@@ -285,13 +396,24 @@ export async function exportBoardToImage(
   const allElements = board.layers.flatMap((layer) => layer.elements);
   const polls = options.includePolls ? board.polls || [] : [];
 
-  const bbox = calculateBoundingBox(allElements, noteGroups, polls, options.padding);
+  await preloadImages(allElements);
+
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  if (!tempCtx) {
+    throw new Error('无法创建 canvas 上下文');
+  }
+
+  const bbox = calculateBoundingBox(tempCtx, allElements, noteGroups, polls, options.padding);
 
   const width = bbox.maxX - bbox.minX;
   const height = bbox.maxY - bbox.minY;
 
-  const scaledWidth = Math.round(width * options.scale);
-  const scaledHeight = Math.round(height * options.scale);
+  const dpr = window.devicePixelRatio || 1;
+  const finalScale = options.scale * dpr;
+  
+  const scaledWidth = Math.round(width * finalScale);
+  const scaledHeight = Math.round(height * finalScale);
 
   const canvas = document.createElement('canvas');
   canvas.width = scaledWidth;
@@ -302,7 +424,9 @@ export async function exportBoardToImage(
     throw new Error('无法创建 canvas 上下文');
   }
 
-  ctx.scale(options.scale, options.scale);
+  setupContextQuality(ctx);
+
+  ctx.scale(finalScale, finalScale);
   ctx.translate(-bbox.minX, -bbox.minY);
 
   ctx.fillStyle = options.backgroundColor || board.backgroundColor || '#f5f5f5';
