@@ -130,7 +130,7 @@ const mockTemplates: Template[] = [
   },
   {
     _id: 'template-workflow',
-    name: '流程梳理',
+    name: '流程图',
     description: '可视化梳理业务流程、工作流和决策路径',
     category: 'workflow',
     thumbnail: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
@@ -138,6 +138,17 @@ const mockTemplates: Template[] = [
     width: 3500,
     height: 2200,
     backgroundColor: '#f0f9ff',
+  },
+  {
+    _id: 'template-brainstorm',
+    name: '头脑风暴',
+    description: '激发团队创意，自由发散想法，快速收集灵感',
+    category: 'brainstorm',
+    thumbnail: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    icon: '💡',
+    width: 3500,
+    height: 2400,
+    backgroundColor: '#fffbeb',
   },
   {
     _id: 'template-weekly',
@@ -173,37 +184,53 @@ const createMockBoardFromTemplate = (
 
 export const templateApi = {
   async getTemplates(): Promise<Template[]> {
-    const response = await fetch(TEMPLATE_API_URL);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to fetch templates');
+    try {
+      const response = await fetch(TEMPLATE_API_URL);
+      if (!response.ok) {
+        throw new Error('Failed to fetch templates');
+      }
+      return response.json();
+    } catch (error) {
+      console.warn('Using mock templates due to API error:', error);
+      return mockTemplates;
     }
-    return response.json();
   },
 
   async getTemplate(templateId: string): Promise<Template | null> {
-    const response = await fetch(`${TEMPLATE_API_URL}/${templateId}`);
-    if (!response.ok) {
-      if (response.status === 404) return null;
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to fetch template');
+    try {
+      const response = await fetch(`${TEMPLATE_API_URL}/${templateId}`);
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error('Failed to fetch template');
+      }
+      return response.json();
+    } catch (error) {
+      console.warn('Using mock template due to API error:', error);
+      return mockTemplates.find((t) => t._id === templateId) || null;
     }
-    return response.json();
   },
 
   async createBoardFromTemplate(
     templateId: string,
     data: { name: string; ownerId: string }
   ): Promise<Board | null> {
-    const response = await fetch(`${TEMPLATE_API_URL}/${templateId}/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to create board from template');
+    try {
+      const response = await fetch(`${TEMPLATE_API_URL}/${templateId}/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to create board from template');
+      }
+      return response.json();
+    } catch (error) {
+      console.warn('Using mock board creation due to API error:', error);
+      const template = mockTemplates.find((t) => t._id === templateId);
+      if (template) {
+        return createMockBoardFromTemplate(template, data);
+      }
+      throw error;
     }
-    return response.json();
   },
 };

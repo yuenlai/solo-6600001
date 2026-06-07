@@ -6,11 +6,21 @@ interface TemplateCenterProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string, templateId?: string) => void;
+  showWelcome?: boolean;
 }
 
-export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose, onCreate }) => {
+const CATEGORIES = [
+  { id: 'all', name: '全部', icon: '📁' },
+  { id: 'brainstorm', name: '头脑风暴', icon: '💡' },
+  { id: 'meeting', name: '会议协作', icon: '📝' },
+  { id: 'workflow', name: '流程图表', icon: '🔄' },
+  { id: 'productivity', name: '效率工具', icon: '⚡' },
+];
+
+export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose, onCreate, showWelcome = false }) => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState('all');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -22,8 +32,13 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
       setSelectedTemplate(null);
       setName('');
       setError(null);
+      setActiveCategory('all');
     }
   }, [isOpen]);
+
+  const filteredTemplates = activeCategory === 'all' 
+    ? templates 
+    : templates.filter((t) => t.category === activeCategory);
 
   const loadTemplates = async () => {
     try {
@@ -217,21 +232,38 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
             padding: '24px 32px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
+            gap: '24px',
           }}
         >
-          <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '22px',
-                fontWeight: 600,
-                color: '#1a1a1a',
-              }}
-            >
-              模板中心
-            </h2>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: '22px',
+                  fontWeight: 600,
+                  color: '#1a1a1a',
+                }}
+              >
+                模板中心
+              </h2>
+              {showWelcome && (
+                <span
+                  style={{
+                    padding: '2px 10px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    borderRadius: '10px',
+                  }}
+                >
+                  👋 欢迎首次使用
+                </span>
+              )}
+            </div>
             <p
               style={{
                 margin: '4px 0 0',
@@ -241,6 +273,21 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
             >
               选择一个模板快速开始，或创建空白白板
             </p>
+            {showWelcome && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '10px 14px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  color: '#1e40af',
+                }}
+              >
+                💡 小提示：选择一个模板，我们会为你预置好常用的内容结构，让你更快进入协作！
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -325,20 +372,63 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
               padding: '24px 32px',
             }}
           >
-            <div style={{ marginBottom: '24px' }}>
-              <h3
-                style={{
-                  margin: '0 0 16px',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  color: '#374151',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <span>📄</span> 空白白板
-              </h3>
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                marginBottom: '24px',
+                flexWrap: 'wrap',
+              }}
+            >
+              {CATEGORIES.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setActiveCategory(category.id)}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    borderRadius: '20px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: activeCategory === category.id
+                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                      : '#f3f4f6',
+                    color: activeCategory === category.id ? '#fff' : '#374151',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeCategory !== category.id) {
+                      e.currentTarget.style.background = '#e5e7eb';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeCategory !== category.id) {
+                      e.currentTarget.style.background = '#f3f4f6';
+                    }
+                  }}
+                >
+                  <span style={{ marginRight: '6px' }}>{category.icon}</span>
+                  {category.name}
+                </button>
+              ))}
+            </div>
+
+            {activeCategory === 'all' && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3
+                  style={{
+                    margin: '0 0 16px',
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <span>📄</span> 空白白板
+                </h3>
               <div
                 onClick={() => setSelectedTemplate(null)}
                 style={{
@@ -428,17 +518,18 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
                     空白白板
                   </h3>
                   <p
-                    style={{
-                      margin: '4px 0 0',
-                      fontSize: '13px',
-                      color: '#6b7280',
-                    }}
-                  >
-                    从零开始创建
-                  </p>
-                </div>
+                  style={{
+                    margin: '4px 0 0',
+                    fontSize: '13px',
+                    color: '#6b7280',
+                  }}
+                >
+                  从零开始创建
+                </p>
               </div>
             </div>
+            </div>
+            )}
 
             <div>
               <h3
@@ -452,7 +543,7 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
                   gap: '8px',
                 }}
               >
-                <span>✨</span> 精选模板
+                <span>✨</span> {activeCategory === 'all' ? '精选模板' : CATEGORIES.find((c) => c.id === activeCategory)?.name || '模板'}
               </h3>
               {loading ? (
                 <div
@@ -482,7 +573,7 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
                     gap: '16px',
                   }}
                 >
-                  {templates.map((template) => (
+                  {filteredTemplates.map((template) => (
                     <TemplateCard
                       key={template._id}
                       template={template}
@@ -490,6 +581,18 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
                       onClick={() => setSelectedTemplate(template._id)}
                     />
                   ))}
+                  {filteredTemplates.length === 0 && !loading && (
+                    <div
+                      style={{
+                        gridColumn: '1 / -1',
+                        textAlign: 'center',
+                        padding: '48px 16px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: '14px' }}>该分类暂无模板</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

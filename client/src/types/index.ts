@@ -12,6 +12,13 @@ export interface BoardElement {
   points?: number[];
   rotation?: number;
   opacity?: number;
+  fontSize?: number;
+  fontWeight?: number;
+  textAlign?: string;
+  lineHeight?: number;
+  borderRadius?: number;
+  borderTopLeftRadius?: number;
+  borderTopRightRadius?: number;
 }
 
 export interface Layer {

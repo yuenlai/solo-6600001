@@ -133,6 +133,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
   const [isTemplateCenterOpen, setIsTemplateCenterOpen] = useState(false);
+  const [showWelcomeTip, setShowWelcomeTip] = useState(false);
   const username = useWhiteboardStore((state) => state.username);
 
   const userId = 'user-1';
@@ -140,6 +141,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
   useEffect(() => {
     loadBoards();
   }, []);
+
+  useEffect(() => {
+    if (!loading && boards.length === 0) {
+      const hasSeenWelcome = localStorage.getItem('has_seen_welcome');
+      if (!hasSeenWelcome) {
+        setIsTemplateCenterOpen(true);
+        setShowWelcomeTip(true);
+        localStorage.setItem('has_seen_welcome', 'true');
+      }
+    }
+  }, [loading, boards]);
 
   const loadBoards = async () => {
     try {
@@ -214,7 +226,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
     </div>
   );
 
-  const BoardGrid: React.FC<{ boards: Board[]; loading?: boolean }> = ({ boards: boardList, loading }) => {
+  const BoardGrid: React.FC<{ boards: Board[]; loading?: boolean; onOpenTemplate?: () => void }> = ({ boards: boardList, loading, onOpenTemplate }) => {
     if (loading) {
       return (
         <div
@@ -244,23 +256,61 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
         <div
           style={{
             textAlign: 'center',
-            padding: '48px 16px',
+            padding: '64px 16px',
             color: '#6b7280',
           }}
         >
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            style={{ margin: '0 auto 16px', opacity: 0.5 }}
+          <div
+            style={{
+              width: '80px',
+              height: '80px',
+              margin: '0 auto 20px',
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          </svg>
-          <p style={{ margin: 0, fontSize: '14px' }}>暂无白板</p>
-          <p style={{ margin: '8px 0 0', fontSize: '13px' }}>点击「新建白板」开始创建</p>
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="1.5"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="9" x2="15" y2="9" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+          </div>
+          <p style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>开始你的第一个白板</p>
+          <p style={{ margin: '8px 0 24px', fontSize: '14px', color: '#6b7280' }}>
+            选择模板快速开始，或创建空白白板自由创作
+          </p>
+          <button
+            onClick={onOpenTemplate}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 24px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#fff',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            从模板开始
+          </button>
         </div>
       );
     }
@@ -456,24 +506,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
 
         <section style={{ marginBottom: '40px' }}>
           <SectionHeader title="最近编辑" count={loading ? undefined : recentBoards.length} />
-          <BoardGrid boards={recentBoards.slice(0, 8)} loading={loading && boards.length === 0} />
+          <BoardGrid 
+            boards={recentBoards.slice(0, 8)} 
+            loading={loading && boards.length === 0}
+            onOpenTemplate={() => setIsTemplateCenterOpen(true)}
+          />
         </section>
 
         <section style={{ marginBottom: '40px' }}>
           <SectionHeader title="我创建的" count={loading ? undefined : myBoards.length} />
-          <BoardGrid boards={myBoards} loading={loading && boards.length === 0} />
+          <BoardGrid 
+            boards={myBoards} 
+            loading={loading && boards.length === 0}
+            onOpenTemplate={() => setIsTemplateCenterOpen(true)}
+          />
         </section>
 
         <section>
           <SectionHeader title="我参与的" count={loading ? undefined : sharedBoards.length} />
-          <BoardGrid boards={sharedBoards} loading={loading && boards.length === 0} />
+          <BoardGrid 
+            boards={sharedBoards} 
+            loading={loading && boards.length === 0}
+            onOpenTemplate={() => setIsTemplateCenterOpen(true)}
+          />
         </section>
       </main>
 
       <TemplateCenter
         isOpen={isTemplateCenterOpen}
-        onClose={() => setIsTemplateCenterOpen(false)}
+        onClose={() => {
+          setIsTemplateCenterOpen(false);
+          setShowWelcomeTip(false);
+        }}
         onCreate={handleCreateBoard}
+        showWelcome={showWelcomeTip}
       />
     </div>
   );
