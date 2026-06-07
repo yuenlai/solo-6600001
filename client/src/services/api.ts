@@ -1,4 +1,4 @@
-import { Board, Template, SharePermission, ShareResult, Comment, CommentReply } from '../types';
+import { Board, Template, SharePermission, ShareResult, Comment, CommentReply, Snapshot } from '../types';
 
 const API_BASE_URL = '/api/boards';
 const TEMPLATE_API_URL = '/api/templates';
@@ -143,6 +143,62 @@ export const boardApi = {
     return response.ok;
   },
 
+  async getSnapshots(boardId: string): Promise<Snapshot[]> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/snapshots`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch snapshots');
+    }
+    return response.json();
+  },
+
+  async createSnapshot(boardId: string, data: { name?: string; description?: string; createdBy: string; createdById: string }): Promise<Snapshot> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/snapshots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create snapshot');
+    }
+    return response.json();
+  },
+
+  async restoreSnapshot(boardId: string, snapshotId: string): Promise<Board> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/snapshots/${snapshotId}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to restore snapshot');
+    }
+    return response.json();
+  },
+
+  async updateSnapshot(boardId: string, snapshotId: string, data: { name?: string; description?: string }): Promise<Snapshot> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/snapshots/${snapshotId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to update snapshot');
+    }
+    return response.json();
+  },
+
+  async deleteSnapshot(boardId: string, snapshotId: string): Promise<boolean> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/snapshots/${snapshotId}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to delete snapshot');
+    }
+    return response.ok;
+  },
+
   getMockBoards(): Board[] {
     const now = new Date().toISOString();
     const yesterday = new Date(Date.now() - 86400000).toISOString();
@@ -157,6 +213,7 @@ export const boardApi = {
         collaborators: ['user-2', 'user-3'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
+        snapshots: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#f5f5f5',
@@ -173,6 +230,7 @@ export const boardApi = {
         collaborators: ['user-4'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
+        snapshots: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#ffffff',
@@ -189,6 +247,7 @@ export const boardApi = {
         collaborators: ['user-1', 'user-5'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
+        snapshots: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#f0f8ff',
@@ -205,6 +264,7 @@ export const boardApi = {
         collaborators: ['user-1'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
+        snapshots: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#fff8e1',
@@ -226,6 +286,7 @@ export const boardApi = {
       collaborators: [],
       layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
       comments: [],
+      snapshots: [],
       width: 3000,
       height: 2000,
       backgroundColor: '#ffffff',
@@ -297,6 +358,7 @@ const createMockBoardFromTemplate = (
     collaborators: [],
     layers: template.layers || [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
     comments: [],
+    snapshots: [],
     width: template.width,
     height: template.height,
     backgroundColor: template.backgroundColor,

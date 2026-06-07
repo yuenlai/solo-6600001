@@ -51,6 +51,7 @@ export interface Board {
   collaborators: string[];
   layers: Layer[];
   comments: Comment[];
+  snapshots: Snapshot[];
   width: number;
   height: number;
   backgroundColor: string;
@@ -143,4 +144,14 @@ export interface MeetingMinutesContent {
 export interface MeetingMinutes {
   content: string;
   generatedAt: string;
+}
+
+export interface Snapshot {
+  id: string;
+  name: string;
+  description?: string;
+  layers: Layer[];
+  createdAt: string;
+  createdBy: string;
+  createdById: string;
 }

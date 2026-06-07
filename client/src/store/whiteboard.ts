@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
 
@@ -25,6 +25,8 @@ interface WhiteboardState {
   showMeetingMinutes: boolean;
   selectedTaskCardId: string | null;
   showTaskCardEditor: boolean;
+  showSnapshotHistory: boolean;
+  snapshots: Snapshot[];
 
   // Actions
   setBoard: (board: Board) => void;
@@ -70,6 +72,13 @@ interface WhiteboardState {
   updateTaskCard: (elementId: string, taskData: Partial<TaskCardData>) => void;
   setSelectedTaskCardId: (id: string | null) => void;
   setShowTaskCardEditor: (show: boolean) => void;
+  setShowSnapshotHistory: (show: boolean) => void;
+  setSnapshots: (snapshots: Snapshot[]) => void;
+  loadSnapshots: () => Promise<void>;
+  createSnapshot: (name?: string, description?: string) => Promise<Snapshot | null>;
+  restoreSnapshot: (snapshotId: string) => Promise<boolean>;
+  updateSnapshot: (snapshotId: string, updates: { name?: string; description?: string }) => Promise<boolean>;
+  deleteSnapshot: (snapshotId: string) => Promise<boolean>;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -94,6 +103,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showMeetingMinutes: false,
   selectedTaskCardId: null,
   showTaskCardEditor: false,
+  showSnapshotHistory: false,
+  snapshots: [],
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -426,4 +437,79 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
   setSelectedTaskCardId: (id) => set({ selectedTaskCardId: id }),
   setShowTaskCardEditor: (show) => set({ showTaskCardEditor: show }),
+
+  setShowSnapshotHistory: (show) => set({ showSnapshotHistory: show }),
+
+  setSnapshots: (snapshots) => set({ snapshots }),
+
+  loadSnapshots: async () => {
+    const { board } = get();
+    if (!board) return;
+    try {
+      const snapshots = await boardApi.getSnapshots(board._id);
+      set({ snapshots });
+    } catch (err) {
+      console.error('Failed to load snapshots:', err);
+    }
+  },
+
+  createSnapshot: async (name, description) => {
+    const { board, username, canEdit } = get();
+    if (!board || !canEdit) return null;
+    try {
+      const snapshot = await boardApi.createSnapshot(board._id, {
+        name,
+        description,
+        createdBy: username,
+        createdById: 'user-id'
+      });
+      const { snapshots } = get();
+      set({ snapshots: [...snapshots, snapshot] });
+      return snapshot;
+    } catch (err) {
+      console.error('Failed to create snapshot:', err);
+      return null;
+    }
+  },
+
+  restoreSnapshot: async (snapshotId) => {
+    const { board, canEdit } = get();
+    if (!board || !canEdit) return false;
+    try {
+      const updatedBoard = await boardApi.restoreSnapshot(board._id, snapshotId);
+      set({ board: updatedBoard });
+      socketService.restoreSnapshot(updatedBoard.layers);
+      return true;
+    } catch (err) {
+      console.error('Failed to restore snapshot:', err);
+      return false;
+    }
+  },
+
+  updateSnapshot: async (snapshotId, updates) => {
+    const { board, canEdit, snapshots } = get();
+    if (!board || !canEdit) return false;
+    try {
+      const updatedSnapshot = await boardApi.updateSnapshot(board._id, snapshotId, updates);
+      const newSnapshots = snapshots.map(s => s.id === snapshotId ? updatedSnapshot : s);
+      set({ snapshots: newSnapshots });
+      return true;
+    } catch (err) {
+      console.error('Failed to update snapshot:', err);
+      return false;
+    }
+  },
+
+  deleteSnapshot: async (snapshotId) => {
+    const { board, canEdit, snapshots } = get();
+    if (!board || !canEdit) return false;
+    try {
+      await boardApi.deleteSnapshot(board._id, snapshotId);
+      set({ snapshots: snapshots.filter(s => s.id !== snapshotId) });
+      return true;
+    } catch (err) {
+      console.error('Failed to delete snapshot:', err);
+      return false;
+    }
+  },
 }));

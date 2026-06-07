@@ -30,12 +30,23 @@ const layerSchema = new mongoose.Schema({
   elements: [{ type: mongoose.Schema.Types.Mixed }]
 }, { timestamps: true });
 
+const snapshotSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, required: true },
+  description: { type: String, default: '' },
+  layers: [layerSchema],
+  createdAt: { type: String, required: true },
+  createdBy: { type: String, required: true },
+  createdById: { type: String, required: true }
+});
+
 const boardSchema = new mongoose.Schema({
   name: { type: String, required: true, default: 'Untitled Board' },
   ownerId: { type: String, required: true },
   collaborators: [{ type: String }],
   layers: [layerSchema],
   comments: [commentSchema],
+  snapshots: [snapshotSchema],
   width: { type: Number, default: 3000 },
   height: { type: Number, default: 2000 },
   backgroundColor: { type: String, default: '#ffffff' },

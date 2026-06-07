@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { ShareModal } from './components/ShareModal';
 import { PresentationPanel } from './components/PresentationPanel';
 import { MeetingMinutes } from './components/MeetingMinutes';
+import { SnapshotHistoryPanel } from './components/SnapshotHistoryPanel';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
@@ -211,6 +212,12 @@ const App: React.FC = () => {
         if (currentBoard) {
           const comments = (currentBoard.comments || []).filter(c => c.id !== data.commentId);
           setBoard({ ...currentBoard, comments });
+        }
+      });
+      socketService.onSnapshotRestored((data: { layers: Layer[] }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          setBoard({ ...currentBoard, layers: data.layers });
         }
       });
       socketService.onError((data) => {
@@ -440,6 +447,7 @@ const App: React.FC = () => {
           <CursorOverlay />
           <PresentationPanel />
           <MeetingMinutes />
+          <SnapshotHistoryPanel />
         </div>
         {canEdit && <LayerPanel />}
       </div>

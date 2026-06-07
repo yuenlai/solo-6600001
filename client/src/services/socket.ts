@@ -119,6 +119,12 @@ class SocketService {
     }
   }
 
+  restoreSnapshot(layers: Layer[]): void {
+    if (this.boardId) {
+      this.socket?.emit('restore-snapshot', { boardId: this.boardId, layers });
+    }
+  }
+
   onUserJoined(callback: (data: { socketId: string; username: string }) => void): void {
     this.socket?.on('user-joined', callback);
   }
@@ -189,6 +195,10 @@ class SocketService {
 
   onTaskCardUpdated(callback: (data: { elementId: string; taskData: Partial<TaskCardData>; layerIndex: number }) => void): void {
     this.socket?.on('task-card-updated', callback);
+  }
+
+  onSnapshotRestored(callback: (data: { layers: Layer[] }) => void): void {
+    this.socket?.on('snapshot-restored', callback);
   }
 
   onError(callback: (data: { message: string }) => void): void {

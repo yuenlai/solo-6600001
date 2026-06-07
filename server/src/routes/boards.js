@@ -324,4 +324,129 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
   }
 });
 
+// Get all snapshots for a board
+router.get('/:id/snapshots', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    res.json(board.snapshots || []);
+  } catch (err) {
+    console.error('[Boards] Error fetching snapshots:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create a new snapshot
+router.post('/:id/snapshots', async (req, res) => {
+  try {
+    const { name, description, createdBy, createdById } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const newSnapshot = {
+      id: uuidv4(),
+      name: name || `快照 ${(board.snapshots || []).length + 1}`,
+      description: description || '',
+      layers: JSON.parse(JSON.stringify(board.layers || [])),
+      createdAt: new Date().toISOString(),
+      createdBy: createdBy || 'Anonymous',
+      createdById: createdById || 'anonymous'
+    };
+    
+    const snapshots = board.snapshots || [];
+    snapshots.push(newSnapshot);
+    
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { snapshots },
+      { new: true }
+    );
+    
+    console.log(`[Boards] Created snapshot ${newSnapshot.id} for board ${req.params.id}`);
+    res.json(newSnapshot);
+  } catch (err) {
+    console.error('[Boards] Error creating snapshot:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Restore a snapshot
+router.post('/:id/snapshots/:snapshotId/restore', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const snapshots = board.snapshots || [];
+    const snapshot = snapshots.find(s => s.id === req.params.snapshotId);
+    
+    if (!snapshot) return res.status(404).json({ error: 'Snapshot not found' });
+    
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { layers: JSON.parse(JSON.stringify(snapshot.layers)) },
+      { new: true }
+    );
+    
+    console.log(`[Boards] Restored snapshot ${req.params.snapshotId} for board ${req.params.id}`);
+    res.json(updatedBoard);
+  } catch (err) {
+    console.error('[Boards] Error restoring snapshot:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update a snapshot (name/description)
+router.put('/:id/snapshots/:snapshotId', async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const snapshots = board.snapshots || [];
+    const snapshotIndex = snapshots.findIndex(s => s.id === req.params.snapshotId);
+    
+    if (snapshotIndex < 0) return res.status(404).json({ error: 'Snapshot not found' });
+    
+    snapshots[snapshotIndex] = {
+      ...snapshots[snapshotIndex],
+      name: name || snapshots[snapshotIndex].name,
+      description: description !== undefined ? description : snapshots[snapshotIndex].description
+    };
+    
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { snapshots },
+      { new: true }
+    );
+    
+    console.log(`[Boards] Updated snapshot ${req.params.snapshotId} for board ${req.params.id}`);
+    res.json(snapshots[snapshotIndex]);
+  } catch (err) {
+    console.error('[Boards] Error updating snapshot:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a snapshot
+router.delete('/:id/snapshots/:snapshotId', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const snapshots = (board.snapshots || []).filter(s => s.id !== req.params.snapshotId);
+    
+    await Board.findByIdAndUpdate(req.params.id, { snapshots });
+    
+    console.log(`[Boards] Deleted snapshot ${req.params.snapshotId} for board ${req.params.id}`);
+    res.json({ message: 'Snapshot deleted' });
+  } catch (err) {
+    console.error('[Boards] Error deleting snapshot:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

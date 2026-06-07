@@ -144,6 +144,15 @@ function setupSocketHandlers(io) {
       socket.to(`board:${boardId}`).emit('task-card-updated', { elementId, taskData, layerIndex });
     });
 
+    socket.on('restore-snapshot', ({ boardId, layers }) => {
+      const pos = cursorPositions.get(socket.id);
+      if (!pos || !pos.canEdit) {
+        socket.emit('error', { message: 'You do not have permission to edit this board' });
+        return;
+      }
+      socket.to(`board:${boardId}`).emit('snapshot-restored', { layers });
+    });
+
     socket.on('disconnect', () => {
       const pos = cursorPositions.get(socket.id);
       if (pos) {
