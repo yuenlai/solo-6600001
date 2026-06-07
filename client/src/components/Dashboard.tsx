@@ -41,27 +41,138 @@ const BoardCard: React.FC<{
   board: Board;
   index: number;
   onClick: () => void;
-}> = ({ board, index, onClick }) => {
+  onArchive?: (boardId: string) => void;
+  onUnarchive?: (boardId: string) => void;
+  canEdit?: boolean;
+}> = ({ board, index, onClick, onArchive, onUnarchive, canEdit = true }) => {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(!showMenu);
+  };
+
+  const handleArchive = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onArchive) onArchive(board._id);
+    setShowMenu(false);
+  };
+
+  const handleUnarchive = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onUnarchive) onUnarchive(board._id);
+    setShowMenu(false);
+  };
+
   return (
     <div
       onClick={onClick}
       style={{
         background: '#fff',
         borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+        boxShadow: board.isArchived ? '0 1px 4px rgba(0, 0, 0, 0.06)' : '0 2px 8px rgba(0, 0, 0, 0.08)',
         cursor: 'pointer',
         overflow: 'hidden',
         transition: 'transform 0.2s, box-shadow 0.2s',
+        opacity: board.isArchived ? 0.7 : 1,
+        position: 'relative',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-4px)';
-        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
+        if (!board.isArchived) {
+          e.currentTarget.style.transform = 'translateY(-4px)';
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
+        }
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
+        e.currentTarget.style.boxShadow = board.isArchived ? '0 1px 4px rgba(0, 0, 0, 0.06)' : '0 2px 8px rgba(0, 0, 0, 0.08)';
+        setShowMenu(false);
       }}
     >
+      {canEdit && (
+        <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
+          <button
+            onClick={handleMenuClick}
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
+              border: 'none',
+              background: showMenu ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.9)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '16px',
+              color: '#374151',
+            }}
+          >
+            ⋮
+          </button>
+          {showMenu && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '32px',
+                right: '0',
+                background: '#fff',
+                borderRadius: '8px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                padding: '4px',
+                minWidth: '140px',
+                zIndex: 100,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {board.isArchived ? (
+                <button
+                  onClick={handleUnarchive}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#374151',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                >
+                  <span>↩️</span> 恢复白板
+                </button>
+              ) : (
+                <button
+                  onClick={handleArchive}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#dc2626',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                >
+                  <span>📦</span> 归档白板
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       <div
         style={{
           height: '120px',
@@ -69,6 +180,7 @@ const BoardCard: React.FC<{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          position: 'relative',
         }}
       >
         <span
@@ -81,6 +193,22 @@ const BoardCard: React.FC<{
         >
           {board.name.charAt(0).toUpperCase()}
         </span>
+        {board.isArchived && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '8px',
+              left: '8px',
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '10px',
+            }}
+          >
+            已归档
+          </div>
+        )}
       </div>
       <div style={{ padding: '16px' }}>
         <h3
@@ -88,7 +216,7 @@ const BoardCard: React.FC<{
             margin: 0,
             fontSize: '15px',
             fontWeight: 600,
-            color: '#1a1a1a',
+            color: board.isArchived ? '#6b7280' : '#1a1a1a',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -106,7 +234,7 @@ const BoardCard: React.FC<{
             color: '#6b7280',
           }}
         >
-          <span>{formatDate(board.updatedAt)}</span>
+          <span>{formatDate(board.isArchived && board.archivedAt ? board.archivedAt : board.updatedAt)}</span>
           {board.collaborators.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <svg
@@ -133,8 +261,10 @@ const BoardCard: React.FC<{
 
 export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelect }) => {
   const [boards, setBoards] = useState<Board[]>([]);
+  const [archivedBoards, setArchivedBoards] = useState<Board[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [isTemplateCenterOpen, setIsTemplateCenterOpen] = useState(false);
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [showWelcomeTip, setShowWelcomeTip] = useState(false);
@@ -152,7 +282,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
   }, []);
 
   useEffect(() => {
-    if (!loading && boards.length === 0) {
+    if (!loading && boards.length === 0 && archivedBoards.length === 0) {
       const hasSeenWelcome = localStorage.getItem('has_seen_welcome');
       if (!hasSeenWelcome) {
         setIsTemplateCenterOpen(true);
@@ -160,21 +290,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
         localStorage.setItem('has_seen_welcome', 'true');
       }
     }
-  }, [loading, boards]);
+  }, [loading, boards, archivedBoards]);
 
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [boardsData, teamsData] = await Promise.all([
-        boardApi.getBoards(userId),
+      const [boardsData, archivedBoardsData, teamsData] = await Promise.all([
+        boardApi.getBoards(userId, undefined, false),
+        boardApi.getBoards(userId, undefined, true),
         teamApi.getTeams(userId),
       ]);
       setBoards(boardsData);
+      setArchivedBoards(archivedBoardsData);
       setTeams(teamsData);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleArchive = async (boardId: string) => {
+    if (!confirm('确定要归档这个白板吗？归档后可以在"已归档"区域找到并恢复。')) {
+      return;
+    }
+    try {
+      await boardApi.archiveBoard(boardId);
+      const archivedBoard = boards.find(b => b._id === boardId);
+      if (archivedBoard) {
+        setBoards(prev => prev.filter(b => b._id !== boardId));
+        setArchivedBoards(prev => [{ ...archivedBoard, isArchived: true, archivedAt: new Date().toISOString() }, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to archive board:', error);
+      alert('归档失败，请重试');
+    }
+  };
+
+  const handleUnarchive = async (boardId: string) => {
+    try {
+      await boardApi.unarchiveBoard(boardId);
+      const unarchivedBoard = archivedBoards.find(b => b._id === boardId);
+      if (unarchivedBoard) {
+        setArchivedBoards(prev => prev.filter(b => b._id !== boardId));
+        setBoards(prev => [{ ...unarchivedBoard, isArchived: false, archivedAt: null }, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to unarchive board:', error);
+      alert('恢复失败，请重试');
     }
   };
 
@@ -208,11 +371,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
     }
   };
 
-  const myBoards = boards.filter((b) => b.ownerId === userId);
-  const sharedBoards = boards.filter((b) => b.ownerId !== userId);
-  const recentBoards = [...boards].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
+  const myBoards = boards.filter((b) => b.ownerId === userId && !b.isArchived);
+  const sharedBoards = boards.filter((b) => b.ownerId !== userId && !b.isArchived);
+  const recentBoards = [...boards]
+    .filter((b) => !b.isArchived)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const SectionHeader: React.FC<{ title: string; count?: number }> = ({ title, count }) => (
     <div
@@ -249,7 +412,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
     </div>
   );
 
-  const BoardGrid: React.FC<{ boards: Board[]; loading?: boolean; onOpenTemplate?: () => void }> = ({ boards: boardList, loading, onOpenTemplate }) => {
+  const BoardGrid: React.FC<{ 
+    boards: Board[]; 
+    loading?: boolean; 
+    onOpenTemplate?: () => void;
+    onArchive?: (boardId: string) => void;
+    onUnarchive?: (boardId: string) => void;
+    emptyMessage?: string;
+    showActions?: boolean;
+  }> = ({ 
+    boards: boardList, 
+    loading, 
+    onOpenTemplate, 
+    onArchive, 
+    onUnarchive, 
+    emptyMessage,
+    showActions = true
+  }) => {
     if (loading) {
       return (
         <div
@@ -279,61 +458,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
         <div
           style={{
             textAlign: 'center',
-            padding: '64px 16px',
+            padding: '48px 16px',
             color: '#6b7280',
           }}
         >
           <div
             style={{
-              width: '80px',
-              height: '80px',
-              margin: '0 auto 20px',
-              borderRadius: '20px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              width: '64px',
+              height: '64px',
+              margin: '0 auto 16px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <svg
-              width="40"
-              height="40"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="1.5"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <line x1="9" y1="9" x2="15" y2="9" />
-              <line x1="9" y1="15" x2="15" y2="15" />
-            </svg>
+            <span style={{ fontSize: '28px' }}>📦</span>
           </div>
-          <p style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>开始你的第一个白板</p>
-          <p style={{ margin: '8px 0 24px', fontSize: '14px', color: '#6b7280' }}>
-            选择模板快速开始，或创建空白白板自由创作
+          <p style={{ margin: 0, fontSize: '15px', fontWeight: 500, color: '#374151' }}>
+            {emptyMessage || '暂无白板'}
           </p>
-          <button
-            onClick={onOpenTemplate}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 24px',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#fff',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            从模板开始
-          </button>
+          {onOpenTemplate && (
+            <button
+              onClick={onOpenTemplate}
+              style={{
+                marginTop: '16px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 20px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#fff',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              从模板开始
+            </button>
+          )}
         </div>
       );
     }
@@ -352,6 +522,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
             board={board}
             index={index}
             onClick={() => onBoardSelect(board)}
+            onArchive={showActions ? onArchive : undefined}
+            onUnarchive={showActions ? onUnarchive : undefined}
+            canEdit={board.ownerId === userId}
           />
         ))}
       </div>
@@ -789,6 +962,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
             boards={recentBoards.slice(0, 8)} 
             loading={loading && boards.length === 0}
             onOpenTemplate={() => setIsTemplateCenterOpen(true)}
+            showActions={false}
           />
         </section>
 
@@ -798,17 +972,69 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelec
             boards={myBoards} 
             loading={loading && boards.length === 0}
             onOpenTemplate={() => setIsTemplateCenterOpen(true)}
+            onArchive={handleArchive}
+            onUnarchive={handleUnarchive}
           />
         </section>
 
-        <section>
+        <section style={{ marginBottom: '40px' }}>
           <SectionHeader title="我参与的" count={loading ? undefined : sharedBoards.length} />
           <BoardGrid 
             boards={sharedBoards} 
             loading={loading && boards.length === 0}
             onOpenTemplate={() => setIsTemplateCenterOpen(true)}
+            showActions={false}
           />
         </section>
+
+        {(loading || archivedBoards.length > 0) && (
+          <section>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '16px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+                onClick={() => setShowArchived(!showArchived)}
+              >
+                <SectionHeader title="已归档" count={loading ? undefined : archivedBoards.length} />
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#6b7280"
+                  strokeWidth="2"
+                  style={{
+                    transform: showArchived ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s',
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+            </div>
+            {showArchived && (
+              <BoardGrid 
+                boards={archivedBoards} 
+                loading={loading}
+                emptyMessage="暂无已归档的白板"
+                onArchive={handleArchive}
+                onUnarchive={handleUnarchive}
+              />
+            )}
+          </section>
+        )}
       </main>
 
       <TemplateCenter

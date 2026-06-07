@@ -76,7 +76,9 @@ const boardSchema = new mongoose.Schema({
   backgroundColor: { type: String, default: '#ffffff' },
   isShared: { type: Boolean, default: false },
   shareToken: { type: String, default: null },
-  sharePermission: { type: String, default: 'view', enum: ['view', 'edit'] }
+  sharePermission: { type: String, default: 'view', enum: ['view', 'edit'] },
+  isArchived: { type: Boolean, default: false },
+  archivedAt: { type: String, default: null }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Board', boardSchema);

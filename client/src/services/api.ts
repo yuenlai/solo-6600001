@@ -6,14 +6,38 @@ const NOTIFICATION_API_URL = '/api/notifications';
 const TEAM_API_URL = '/api/teams';
 
 export const boardApi = {
-  async getBoards(userId: string, teamId?: string): Promise<Board[]> {
-    const url = teamId 
-      ? `${API_BASE_URL}?teamId=${teamId}` 
-      : `${API_BASE_URL}?userId=${userId}`;
+  async getBoards(userId: string, teamId?: string, archived?: boolean): Promise<Board[]> {
+    const params = new URLSearchParams();
+    params.append('userId', userId);
+    if (teamId) params.append('teamId', teamId);
+    if (archived !== undefined) params.append('archived', String(archived));
+    const url = `${API_BASE_URL}?${params.toString()}`;
     const response = await fetch(url);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'Failed to fetch boards');
+    }
+    return response.json();
+  },
+
+  async archiveBoard(boardId: string): Promise<Board> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/archive`, {
+      method: 'PATCH',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to archive board');
+    }
+    return response.json();
+  },
+
+  async unarchiveBoard(boardId: string): Promise<Board> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/unarchive`, {
+      method: 'PATCH',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to unarchive board');
     }
     return response.json();
   },
@@ -286,6 +310,8 @@ export const boardApi = {
         isShared: true,
         shareToken: 'mock-token-1',
         sharePermission: 'edit',
+        isArchived: false,
+        archivedAt: null,
       },
       {
         _id: 'board-2',
@@ -305,6 +331,8 @@ export const boardApi = {
         isShared: false,
         shareToken: null,
         sharePermission: 'view',
+        isArchived: false,
+        archivedAt: null,
       },
       {
         _id: 'board-3',
@@ -324,6 +352,8 @@ export const boardApi = {
         isShared: true,
         shareToken: 'mock-token-3',
         sharePermission: 'view',
+        isArchived: false,
+        archivedAt: null,
       },
       {
         _id: 'board-4',
@@ -343,6 +373,29 @@ export const boardApi = {
         isShared: false,
         shareToken: null,
         sharePermission: 'view',
+        isArchived: false,
+        archivedAt: null,
+      },
+      {
+        _id: 'board-5',
+        name: '已完成项目 - Q1计划',
+        ownerId: 'user-1',
+        teamId: 'team-1',
+        collaborators: ['user-2'],
+        layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
+        comments: [],
+        snapshots: [],
+        polls: [],
+        width: 3000,
+        height: 2000,
+        backgroundColor: '#e8f5e9',
+        createdAt: lastWeek,
+        updatedAt: lastWeek,
+        isShared: false,
+        shareToken: null,
+        sharePermission: 'view',
+        isArchived: true,
+        archivedAt: twoDaysAgo,
       },
     ];
   },
@@ -367,6 +420,8 @@ export const boardApi = {
       isShared: false,
       shareToken: null,
       sharePermission: 'view',
+      isArchived: false,
+      archivedAt: null,
     };
   },
 };
@@ -441,6 +496,8 @@ const createMockBoardFromTemplate = (
     isShared: false,
     shareToken: null,
     sharePermission: 'view',
+    isArchived: false,
+    archivedAt: null,
   };
 };
 

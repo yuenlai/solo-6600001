@@ -6,21 +6,26 @@ const { Board, readBoards } = require('../storage');
 // Get all boards for a user or team
 router.get('/', async (req, res) => {
   try {
-    const { userId, teamId } = req.query;
+    const { userId, teamId, archived } = req.query;
+    
+    const query = {};
     
     if (teamId) {
-      const boards = await Board.find({ teamId }).sort({ updatedAt: -1 }).exec();
-      console.log(`[Boards] Fetched ${boards.length} boards for team ${teamId}`);
-      return res.json(boards);
-    }
-    
-    if (!userId) {
+      query.teamId = teamId;
+    } else if (userId) {
+      query.$or = [{ ownerId: userId }, { collaborators: userId }];
+    } else {
       return res.status(400).json({ error: 'userId or teamId is required' });
     }
-    const boards = await Board.find({
-      $or: [{ ownerId: userId }, { collaborators: userId }]
-    }).sort({ updatedAt: -1 }).exec();
-    console.log(`[Boards] Fetched ${boards.length} boards for user ${userId}`);
+    
+    if (archived !== undefined) {
+      query.isArchived = archived === 'true';
+    } else {
+      query.isArchived = false;
+    }
+    
+    const boards = await Board.find(query).sort({ updatedAt: -1 }).exec();
+    console.log(`[Boards] Fetched ${boards.length} boards for ${teamId ? `team ${teamId}` : `user ${userId}`} (archived: ${archived})`);
     res.json(boards);
   } catch (err) {
     console.error('[Boards] Error fetching boards:', err);
@@ -619,6 +624,48 @@ router.delete('/:id/polls/:pollId', async (req, res) => {
     res.json({ message: 'Poll deleted' });
   } catch (err) {
     console.error('[Boards] Error deleting poll:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Archive a board
+router.patch('/:id/archive', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { isArchived: true, archivedAt: new Date().toISOString() },
+      { new: true }
+    );
+    
+    console.log(`[Boards] Archived board ${req.params.id}`);
+    res.json(updatedBoard);
+  } catch (err) {
+    console.error('[Boards] Error archiving board:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unarchive (restore) a board
+router.patch('/:id/unarchive', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { isArchived: false, archivedAt: null },
+      { new: true }
+    );
+    
+    console.log(`[Boards] Unarchived board ${req.params.id}`);
+    res.json(updatedBoard);
+  } catch (err) {
+    console.error('[Boards] Error unarchiving board:', err);
     res.status(500).json({ error: err.message });
   }
 });

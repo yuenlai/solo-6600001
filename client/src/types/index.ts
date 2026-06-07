@@ -74,6 +74,8 @@ export interface Board {
   isShared?: boolean;
   shareToken?: string | null;
   sharePermission?: SharePermission;
+  isArchived?: boolean;
+  archivedAt?: string | null;
 }
 
 export interface Team {

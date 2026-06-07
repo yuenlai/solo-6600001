@@ -317,6 +317,21 @@ const App: React.FC = () => {
     setBoard(updatedBoard);
   };
 
+  const handleArchiveBoard = async () => {
+    if (!activeBoard) return;
+    if (!confirm('确定要归档这个白板吗？归档后可以在工作台的"已归档"区域找到并恢复。')) {
+      return;
+    }
+    try {
+      await boardApi.archiveBoard(activeBoard._id);
+      alert('白板已归档');
+      handleBackToDashboard();
+    } catch (error) {
+      console.error('Failed to archive board:', error);
+      alert('归档失败，请重试');
+    }
+  };
+
   if (loadingSharedBoard) {
     return (
       <div style={{
@@ -606,6 +621,34 @@ const App: React.FC = () => {
           ⏱️
           计时
         </button>
+        {!useWhiteboardStore.getState().isShareAccess && canEdit && (
+          <button
+            onClick={handleArchiveBoard}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: '#374151',
+              background: '#f3f4f6',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#f3f4f6';
+            }}
+          >
+            📦
+            归档
+          </button>
+        )}
         {!useWhiteboardStore.getState().isShareAccess && (
           <button
             onClick={() => setIsShareModalOpen(true)}
