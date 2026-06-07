@@ -93,6 +93,37 @@ const App: React.FC = () => {
           setBoard({ ...currentBoard, layers });
         }
       });
+      socketService.onElementUpdated((data: { elementId: string; updates: Partial<BoardElement>; layerIndex: number }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const layers = [...currentBoard.layers];
+          const elements = layers[data.layerIndex].elements.map(el =>
+            el.id === data.elementId ? { ...el, ...data.updates } : el
+          );
+          layers[data.layerIndex] = { ...layers[data.layerIndex], elements };
+          setBoard({ ...currentBoard, layers });
+        }
+      });
+      socketService.onElementDeleted((data: { elementId: string; layerIndex: number }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const layers = [...currentBoard.layers];
+          const elements = layers[data.layerIndex].elements.filter(el => el.id !== data.elementId);
+          layers[data.layerIndex] = { ...layers[data.layerIndex], elements };
+          setBoard({ ...currentBoard, layers });
+        }
+      });
+      socketService.onTaskCardUpdated((data: { elementId: string; taskData: any; layerIndex: number }) => {
+        const { board: currentBoard } = useWhiteboardStore.getState();
+        if (currentBoard) {
+          const layers = [...currentBoard.layers];
+          const elements = layers[data.layerIndex].elements.map(el =>
+            el.id === data.elementId ? { ...el, taskData: { ...el.taskData, ...data.taskData } } : el
+          );
+          layers[data.layerIndex] = { ...layers[data.layerIndex], elements };
+          setBoard({ ...currentBoard, layers });
+        }
+      });
       socketService.onLayersUpdated((data: { layers: Layer[] }) => {
         const { board: currentBoard } = useWhiteboardStore.getState();
         if (currentBoard) {

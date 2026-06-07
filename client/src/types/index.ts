@@ -1,6 +1,18 @@
+export type TaskStatus = 'todo' | 'in-progress' | 'done';
+
+export interface TaskCardData {
+  title: string;
+  description?: string;
+  assignee?: string;
+  assigneeId?: string;
+  status: TaskStatus;
+  priority?: 'low' | 'medium' | 'high';
+  dueDate?: string;
+}
+
 export interface BoardElement {
   id: string;
-  type: 'path' | 'rect' | 'circle' | 'text' | 'sticky-note' | 'line' | 'image';
+  type: 'path' | 'rect' | 'circle' | 'text' | 'sticky-note' | 'line' | 'image' | 'task-card';
   x: number;
   y: number;
   width?: number;
@@ -19,6 +31,7 @@ export interface BoardElement {
   borderRadius?: number;
   borderTopLeftRadius?: number;
   borderTopRightRadius?: number;
+  taskData?: TaskCardData;
 }
 
 export interface Layer {
@@ -92,7 +105,7 @@ export interface Comment {
   replies: CommentReply[];
 }
 
-export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'eraser' | 'comment';
+export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'task-card' | 'eraser' | 'comment';
 
 export interface PresentationStep {
   id: string;

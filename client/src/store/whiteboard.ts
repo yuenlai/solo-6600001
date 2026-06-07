@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
 
@@ -23,6 +23,8 @@ interface WhiteboardState {
   isPresentationPlaying: boolean;
   showPresentationPanel: boolean;
   showMeetingMinutes: boolean;
+  selectedTaskCardId: string | null;
+  showTaskCardEditor: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -65,6 +67,9 @@ interface WhiteboardState {
   goToNextPresentationStep: () => void;
   goToPrevPresentationStep: () => void;
   setShowMeetingMinutes: (show: boolean) => void;
+  updateTaskCard: (elementId: string, taskData: Partial<TaskCardData>) => void;
+  setSelectedTaskCardId: (id: string | null) => void;
+  setShowTaskCardEditor: (show: boolean) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -87,6 +92,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   isPresentationPlaying: false,
   showPresentationPanel: false,
   showMeetingMinutes: false,
+  selectedTaskCardId: null,
+  showTaskCardEditor: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -395,4 +402,19 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   setShowMeetingMinutes: (show) => set({ showMeetingMinutes: show }),
+
+  updateTaskCard: (elementId, taskData) => {
+    const { board, activeLayerIndex, canEdit } = get();
+    if (!board || !canEdit) return;
+    const layers = [...board.layers];
+    const elements = layers[activeLayerIndex].elements.map(el =>
+      el.id === elementId ? { ...el, taskData: { ...el.taskData, ...taskData } } as BoardElement : el
+    );
+    layers[activeLayerIndex] = { ...layers[activeLayerIndex], elements };
+    set({ board: { ...board, layers } });
+    socketService.updateTaskCard(elementId, taskData, activeLayerIndex);
+  },
+
+  setSelectedTaskCardId: (id) => set({ selectedTaskCardId: id }),
+  setShowTaskCardEditor: (show) => set({ showTaskCardEditor: show }),
 }));

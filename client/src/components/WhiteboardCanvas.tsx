@@ -5,6 +5,7 @@ import { socketService } from '../services/socket';
 import { BoardElement, Comment } from '../types';
 import { CommentPanel } from './CommentPanel';
 import { AddCommentModal } from './AddCommentModal';
+import { TaskCard, TaskCardEditor } from './TaskCard';
 
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,7 +26,9 @@ export const WhiteboardCanvas: React.FC = () => {
     presentationSteps,
     isPresentationMode,
     currentPresentationStepIndex,
-    showPresentationPanel
+    showPresentationPanel,
+    showTaskCardEditor,
+    setShowTaskCardEditor
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -52,6 +55,7 @@ export const WhiteboardCanvas: React.FC = () => {
         switch (el.type) {
           case 'rect':
           case 'sticky-note':
+          case 'task-card':
             hit = x >= el.x && x <= el.x + (el.width || 0) &&
                   y >= el.y && y <= el.y + (el.height || 0);
             break;
@@ -150,6 +154,21 @@ export const WhiteboardCanvas: React.FC = () => {
           id: uuidv4(), type: 'sticky-note',
           x: point.x, y: point.y, width: 160, height: 120,
           fill: '#FFF59D', stroke: '#F9A825', strokeWidth: 1, text: '便签内容'
+        };
+        break;
+      case 'task-card':
+        element = {
+          id: uuidv4(), type: 'task-card',
+          x: point.x, y: point.y, width: 240, height: 160,
+          fill: '#ffffff', stroke: '#9ca3af', strokeWidth: 2,
+          taskData: {
+            title: '新任务',
+            description: '',
+            status: 'todo',
+            priority: 'medium',
+            assignee: '',
+            dueDate: '',
+          }
         };
         break;
       case 'text':
@@ -406,7 +425,27 @@ export const WhiteboardCanvas: React.FC = () => {
         </div>
       ))}
 
+      {board?.layers.map((layer) => (
+        layer.visible && layer.elements
+          .filter(el => el.type === 'task-card')
+          .map(el => (
+            <TaskCard
+              key={el.id}
+              element={el}
+              scale={canvasTransform.scale}
+              translateX={canvasTransform.translateX}
+              translateY={canvasTransform.translateY}
+            />
+          ))
+      ))}
+
       {showCommentPanel && <CommentPanel />}
+
+      {showTaskCardEditor && (
+        <TaskCardEditor
+          onClose={() => setShowTaskCardEditor(false)}
+        />
+      )}
 
       {addingComment && (
         <AddCommentModal

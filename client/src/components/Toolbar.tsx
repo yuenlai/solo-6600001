@@ -10,6 +10,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
   { type: 'line', label: '直线', icon: '📏' },
   { type: 'text', label: '文本', icon: '🔤' },
   { type: 'sticky-note', label: '便签', icon: '📝' },
+  { type: 'task-card', label: '任务卡片', icon: '✅' },
   { type: 'eraser', label: '橡皮', icon: '🧹' },
   { type: 'comment', label: '评论', icon: '💬' },
 ];

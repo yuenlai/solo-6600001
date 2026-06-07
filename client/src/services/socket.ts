@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply } from '../types';
+import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData } from '../types';
 
 const SERVER_URL = '/';
 
@@ -113,6 +113,12 @@ class SocketService {
     }
   }
 
+  updateTaskCard(elementId: string, taskData: Partial<TaskCardData>, layerIndex: number): void {
+    if (this.boardId) {
+      this.socket?.emit('update-task-card', { boardId: this.boardId, elementId, taskData, layerIndex });
+    }
+  }
+
   onUserJoined(callback: (data: { socketId: string; username: string }) => void): void {
     this.socket?.on('user-joined', callback);
   }
@@ -179,6 +185,10 @@ class SocketService {
 
   onCommentDeleted(callback: (data: { commentId: string }) => void): void {
     this.socket?.on('comment-deleted', callback);
+  }
+
+  onTaskCardUpdated(callback: (data: { elementId: string; taskData: Partial<TaskCardData>; layerIndex: number }) => void): void {
+    this.socket?.on('task-card-updated', callback);
   }
 
   onError(callback: (data: { message: string }) => void): void {
