@@ -21,8 +21,13 @@ export const WhiteboardCanvas: React.FC = () => {
   const startPosRef = useRef({ x: 0, y: 0 });
   const currentMousePosRef = useRef({ x: 0, y: 0 });
   const panStartRef = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
+  const velocityRef = useRef({ vx: 0, vy: 0 });
+  const lastPanPosRef = useRef({ x: 0, y: 0, time: 0 });
+  const animationFrameRef = useRef<number | null>(null);
+  const spacePressedRef = useRef(false);
   const [, forceUpdate] = useState({});
   const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
 
   const [addingComment, setAddingComment] = useState<{
     position: { x: number; y: number };
@@ -47,6 +52,9 @@ export const WhiteboardCanvas: React.FC = () => {
     noteGroups,
     searchResults,
     selectedSearchResultId,
+    resetView,
+    zoomIn,
+    zoomOut,
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -97,18 +105,30 @@ export const WhiteboardCanvas: React.FC = () => {
     return null;
   }, [board]);
 
+  const startPanning = useCallback((clientX: number, clientY: number) => {
+    if (followState.isFollowing) {
+      stopFollowingHost();
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    isPanningRef.current = true;
+    setIsPanning(true);
+    panStartRef.current = {
+      x: clientX,
+      y: clientY,
+      translateX: canvasTransform.translateX,
+      translateY: canvasTransform.translateY
+    };
+    lastPanPosRef.current = { x: clientX, y: clientY, time: Date.now() };
+    velocityRef.current = { vx: 0, vy: 0 };
+  }, [canvasTransform, followState.isFollowing, stopFollowingHost]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      if (followState.isFollowing) {
-        stopFollowingHost();
-      }
-      isPanningRef.current = true;
-      panStartRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        translateX: canvasTransform.translateX,
-        translateY: canvasTransform.translateY
-      };
+    if (e.button === 1 || (e.button === 0 && (e.altKey || spacePressedRef.current))) {
+      e.preventDefault();
+      startPanning(e.clientX, e.clientY);
       return;
     }
 
@@ -131,6 +151,38 @@ export const WhiteboardCanvas: React.FC = () => {
     currentPathRef.current = [point.x, point.y];
   }, [canEdit, getCanvasPoint, activeTool, findElementAtPoint, canvasTransform, followState.isFollowing, stopFollowingHost]);
 
+  const applyInertia = useCallback(() => {
+    const friction = 0.95;
+    const minVelocity = 0.5;
+    
+    const animate = () => {
+      const { vx, vy } = velocityRef.current;
+      if (Math.abs(vx) < minVelocity && Math.abs(vy) < minVelocity) {
+        animationFrameRef.current = null;
+        return;
+      }
+      
+      const state = useWhiteboardStore.getState();
+      const newTranslateX = state.canvasTransform.translateX + vx;
+      const newTranslateY = state.canvasTransform.translateY + vy;
+      
+      state.setCanvasTransform({
+        scale: state.canvasTransform.scale,
+        translateX: newTranslateX,
+        translateY: newTranslateY
+      });
+      
+      velocityRef.current = {
+        vx: vx * friction,
+        vy: vy * friction
+      };
+      
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, []);
+
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasPoint(e);
     currentMousePosRef.current = point;
@@ -138,6 +190,17 @@ export const WhiteboardCanvas: React.FC = () => {
     if (isPanningRef.current) {
       const dx = e.clientX - panStartRef.current.x;
       const dy = e.clientY - panStartRef.current.y;
+      
+      const now = Date.now();
+      const dt = now - lastPanPosRef.current.time;
+      if (dt > 0) {
+        velocityRef.current = {
+          vx: (e.clientX - lastPanPosRef.current.x) / dt * 16,
+          vy: (e.clientY - lastPanPosRef.current.y) / dt * 16
+        };
+      }
+      lastPanPosRef.current = { x: e.clientX, y: e.clientY, time: now };
+      
       setCanvasTransform({
         scale: canvasTransform.scale,
         translateX: panStartRef.current.translateX + dx,
@@ -159,6 +222,8 @@ export const WhiteboardCanvas: React.FC = () => {
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanningRef.current) {
       isPanningRef.current = false;
+      setIsPanning(false);
+      applyInertia();
       return;
     }
 
@@ -553,28 +618,138 @@ export const WhiteboardCanvas: React.FC = () => {
     ctx.restore();
   }, [board, canvasTransform, searchResults, selectedSearchResultId, activeTool, strokeColor, fillColor, strokeWidth, canEdit, isPresentationMode, isHoveringCanvas]);
 
+  const animateTransform = useCallback((target: { scale: number; translateX: number; translateY: number }) => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    const startTransform = useWhiteboardStore.getState().canvasTransform;
+    const startTime = Date.now();
+    const duration = 150;
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      
+      const currentScale = startTransform.scale + (target.scale - startTransform.scale) * easeProgress;
+      const currentX = startTransform.translateX + (target.translateX - startTransform.translateX) * easeProgress;
+      const currentY = startTransform.translateY + (target.translateY - startTransform.translateY) * easeProgress;
+      
+      useWhiteboardStore.getState().setCanvasTransform({
+        scale: currentScale,
+        translateX: currentX,
+        translateY: currentY
+      });
+      
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        animationFrameRef.current = null;
+      }
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, []);
+
+  const zoomAt = useCallback((clientX: number, clientY: number, newScale: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const { canvasTransform } = useWhiteboardStore.getState();
+    const rect = canvas.getBoundingClientRect();
+    
+    const mouseX = clientX - rect.left;
+    const mouseY = clientY - rect.top;
+    
+    const worldX = (mouseX - canvasTransform.translateX) / canvasTransform.scale;
+    const worldY = (mouseY - canvasTransform.translateY) / canvasTransform.scale;
+    
+    const clampedScale = Math.min(Math.max(newScale, 0.1), 5);
+    
+    const newTranslateX = mouseX - worldX * clampedScale;
+    const newTranslateY = mouseY - worldY * clampedScale;
+    
+    animateTransform({
+      scale: clampedScale,
+      translateX: newTranslateX,
+      translateY: newTranslateY
+    });
+  }, [animateTransform]);
+
   // Handle wheel zoom
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const { canvasTransform, setCanvasTransform, followState, stopFollowingHost } = useWhiteboardStore.getState();
+      const { followState, stopFollowingHost } = useWhiteboardStore.getState();
       
       if (followState.isFollowing) {
         stopFollowingHost();
       }
       
+      const currentTransform = useWhiteboardStore.getState().canvasTransform;
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      const newScale = Math.min(Math.max(canvasTransform.scale * delta, 0.1), 5);
-      setCanvasTransform({
-        scale: newScale,
-        translateX: canvasTransform.translateX,
-        translateY: canvasTransform.translateY
-      });
+      const newScale = currentTransform.scale * delta;
+      
+      zoomAt(e.clientX, e.clientY, newScale);
     };
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [zoomAt]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.code === 'Space' && !spacePressedRef.current) {
+        e.preventDefault();
+        spacePressedRef.current = true;
+        forceUpdate({});
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.code === 'Digit0') {
+        e.preventDefault();
+        resetView();
+      }
+
+      if ((e.metaKey || e.ctrlKey) && (e.code === 'Equal' || e.code === 'NumpadAdd')) {
+        e.preventDefault();
+        zoomIn();
+      }
+
+      if ((e.metaKey || e.ctrlKey) && (e.code === 'Minus' || e.code === 'NumpadSubtract')) {
+        e.preventDefault();
+        zoomOut();
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        spacePressedRef.current = false;
+        forceUpdate({});
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [resetView, zoomIn, zoomOut]);
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, []);
 
   // Load polls and setup socket listeners
@@ -665,7 +840,7 @@ export const WhiteboardCanvas: React.FC = () => {
         style={{
           width: '100%',
           height: '100%',
-          cursor: isPresentationMode ? 'default' : activeTool === 'comment' ? 'pointer' : !canEdit ? 'default' : activeTool === 'select' ? 'default' : 'crosshair',
+          cursor: isPanning ? 'grabbing' : spacePressedRef.current ? 'grab' : isPresentationMode ? 'default' : activeTool === 'comment' ? 'pointer' : !canEdit ? 'default' : activeTool === 'select' ? 'default' : 'crosshair',
           backgroundColor: board?.backgroundColor || '#f5f5f5'
         }}
         onMouseDown={handleMouseDown}
@@ -841,6 +1016,104 @@ export const WhiteboardCanvas: React.FC = () => {
         />
       )}
       <ExportModal />
+
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '16px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '6px 8px',
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #e5e7eb',
+          zIndex: 500,
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <button
+          onClick={zoomOut}
+          title="缩小 (Ctrl/-)"
+          style={{
+            width: '32px',
+            height: '32px',
+            border: 'none',
+            borderRadius: '6px',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontSize: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#f3f4f6';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          ➖
+        </button>
+        <button
+          onClick={resetView}
+          title="重置视图 (Ctrl+0)"
+          style={{
+            minWidth: '60px',
+            height: '28px',
+            border: 'none',
+            borderRadius: '6px',
+            background: '#f3f4f6',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: '#374151',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 10px',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#e5e7eb';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f3f4f6';
+          }}
+        >
+          {Math.round(canvasTransform.scale * 100)}%
+        </button>
+        <button
+          onClick={zoomIn}
+          title="放大 (Ctrl/+)"
+          style={{
+            width: '32px',
+            height: '32px',
+            border: 'none',
+            borderRadius: '6px',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontSize: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#f3f4f6';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          ➕
+        </button>
+      </div>
 
       {!canEdit && (
         <button

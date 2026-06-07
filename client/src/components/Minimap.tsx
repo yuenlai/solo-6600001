@@ -202,12 +202,27 @@ export const Minimap: React.FC = () => {
       const vpW = viewportWidth * scale;
       const vpH = viewportHeight * scale;
 
+      ctx.shadowColor = 'rgba(33, 150, 243, 0.4)';
+      ctx.shadowBlur = 6;
       ctx.strokeStyle = '#2196f3';
       ctx.lineWidth = 2;
-      ctx.fillStyle = 'rgba(33, 150, 243, 0.15)';
+      ctx.fillStyle = 'rgba(33, 150, 243, 0.12)';
       ctx.beginPath();
       ctx.rect(vpX, vpY, vpW, vpH);
       ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.strokeStyle = 'rgba(33, 150, 243, 0.6)';
+      ctx.lineWidth = 1;
+      const crossSize = 6;
+      const centerX = vpX + vpW / 2;
+      const centerY = vpY + vpH / 2;
+      ctx.beginPath();
+      ctx.moveTo(centerX - crossSize, centerY);
+      ctx.lineTo(centerX + crossSize, centerY);
+      ctx.moveTo(centerX, centerY - crossSize);
+      ctx.lineTo(centerX, centerY + crossSize);
       ctx.stroke();
     }
   }, [board, canvasTransform, calculateContentBounds, noteGroups]);
@@ -267,6 +282,11 @@ export const Minimap: React.FC = () => {
     [board, canvasTransform, calculateContentBounds, setCanvasTransform]
   );
 
+  const resetView = useCallback(() => {
+    const { resetView: reset } = useWhiteboardStore.getState();
+    reset();
+  }, []);
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       isDraggingRef.current = true;
@@ -286,6 +306,10 @@ export const Minimap: React.FC = () => {
   const handleMouseUp = useCallback(() => {
     isDraggingRef.current = false;
   }, []);
+
+  const handleDoubleClick = useCallback(() => {
+    resetView();
+  }, [resetView]);
 
   if (!showMinimap) {
     return (
@@ -383,6 +407,8 @@ export const Minimap: React.FC = () => {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
+        title="拖动移动视角，双击重置视图"
       />
     </div>
   );

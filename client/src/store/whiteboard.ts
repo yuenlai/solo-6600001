@@ -161,6 +161,9 @@ interface WhiteboardState {
   deleteNotification: (notificationId: string) => Promise<void>;
   setShowAssetPanel: (show: boolean) => void;
   setShowMinimap: (show: boolean) => void;
+  resetView: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
   setAssets: (assets: Asset[]) => void;
   addAsset: (asset: Omit<Asset, 'id' | 'createdAt' | 'usageCount'>) => void;
   deleteAsset: (assetId: string) => void;
@@ -1149,6 +1152,78 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setShowAssetPanel: (show) => set({ showAssetPanel: show }),
 
   setShowMinimap: (show) => set({ showMinimap: show }),
+
+  resetView: () => {
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      set({
+        canvasTransform: {
+          scale: 1,
+          translateX: rect.width / 2 - 500,
+          translateY: rect.height / 2 - 400,
+        }
+      });
+    } else {
+      set({
+        canvasTransform: { scale: 1, translateX: 0, translateY: 0 }
+      });
+    }
+  },
+
+  zoomIn: () => {
+    const { canvasTransform } = get();
+    const newScale = Math.min(canvasTransform.scale * 1.2, 5);
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const worldX = (centerX - canvasTransform.translateX) / canvasTransform.scale;
+      const worldY = (centerY - canvasTransform.translateY) / canvasTransform.scale;
+      set({
+        canvasTransform: {
+          scale: newScale,
+          translateX: centerX - worldX * newScale,
+          translateY: centerY - worldY * newScale,
+        }
+      });
+    } else {
+      set({
+        canvasTransform: {
+          ...canvasTransform,
+          scale: newScale,
+        }
+      });
+    }
+  },
+
+  zoomOut: () => {
+    const { canvasTransform } = get();
+    const newScale = Math.max(canvasTransform.scale / 1.2, 0.1);
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const worldX = (centerX - canvasTransform.translateX) / canvasTransform.scale;
+      const worldY = (centerY - canvasTransform.translateY) / canvasTransform.scale;
+      set({
+        canvasTransform: {
+          scale: newScale,
+          translateX: centerX - worldX * newScale,
+          translateY: centerY - worldY * newScale,
+        }
+      });
+    } else {
+      set({
+        canvasTransform: {
+          ...canvasTransform,
+          scale: newScale,
+        }
+      });
+    }
+  },
 
   setAssets: (assets) => {
     set({ assets });
