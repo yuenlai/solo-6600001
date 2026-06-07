@@ -16,7 +16,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
 ];
 
 export const Toolbar: React.FC = () => {
-  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory } = useWhiteboardStore();
+  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit } = useWhiteboardStore();
 
   return (
     <div style={{
@@ -90,6 +90,20 @@ export const Toolbar: React.FC = () => {
       >
         📸
       </button>
+      {canEdit && (
+        <button
+          onClick={() => setShowCreatePollModal(true, { x: 200, y: 200 })}
+          title="创建投票"
+          style={{
+            width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+            background: 'transparent',
+            cursor: 'pointer', fontSize: '18px', display: 'flex',
+            alignItems: 'center', justifyContent: 'center'
+          }}
+        >
+          🗳️
+        </button>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
 
@@ -27,6 +27,9 @@ interface WhiteboardState {
   showTaskCardEditor: boolean;
   showSnapshotHistory: boolean;
   snapshots: Snapshot[];
+  showCreatePollModal: boolean;
+  createPollPosition: { x: number; y: number } | null;
+  selectedPollId: string | null;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -79,6 +82,15 @@ interface WhiteboardState {
   restoreSnapshot: (snapshotId: string) => Promise<boolean>;
   updateSnapshot: (snapshotId: string, updates: { name?: string; description?: string }) => Promise<boolean>;
   deleteSnapshot: (snapshotId: string) => Promise<boolean>;
+  setShowCreatePollModal: (show: boolean, position?: { x: number; y: number }) => void;
+  setSelectedPollId: (id: string | null) => void;
+  loadPolls: () => Promise<void>;
+  setPolls: (polls: Poll[]) => void;
+  addPoll: (pollData: Omit<Poll, 'id' | 'createdAt' | 'closed'> & { options: string[] }) => Promise<Poll | null>;
+  votePoll: (pollId: string, optionIds: string | string[]) => Promise<Poll | null>;
+  closePoll: (pollId: string, closed: boolean) => Promise<Poll | null>;
+  deletePoll: (pollId: string) => Promise<boolean>;
+  updatePoll: (pollId: string, updates: Partial<Poll>) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -105,6 +117,9 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showTaskCardEditor: false,
   showSnapshotHistory: false,
   snapshots: [],
+  showCreatePollModal: false,
+  createPollPosition: null,
+  selectedPollId: null,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -511,5 +526,115 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
       console.error('Failed to delete snapshot:', err);
       return false;
     }
+  },
+
+  setShowCreatePollModal: (show, position) => {
+    set({ showCreatePollModal: show, createPollPosition: position || null });
+  },
+
+  setSelectedPollId: (id) => set({ selectedPollId: id }),
+
+  loadPolls: async () => {
+    const { board } = get();
+    if (!board) return;
+    try {
+      const polls = await boardApi.getPolls(board._id);
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        set({ board: { ...currentBoard, polls } });
+      }
+    } catch (err) {
+      console.error('Failed to load polls:', err);
+    }
+  },
+
+  setPolls: (polls) => {
+    const { board } = get();
+    if (!board) return;
+    set({ board: { ...board, polls } });
+  },
+
+  addPoll: async (pollData) => {
+    const { board, username, canEdit } = get();
+    if (!board || !canEdit) return null;
+    try {
+      const savedPoll = await boardApi.createPoll(board._id, {
+        ...pollData,
+        author: username,
+        authorId: 'user-id'
+      });
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const polls = [...(currentBoard.polls || []), savedPoll];
+        set({ board: { ...currentBoard, polls } });
+        socketService.addPoll(savedPoll);
+      }
+      return savedPoll;
+    } catch (err) {
+      console.error('Failed to add poll:', err);
+      return null;
+    }
+  },
+
+  votePoll: async (pollId, optionIds) => {
+    const { board } = get();
+    if (!board) return null;
+    try {
+      const updatedPoll = await boardApi.votePoll(board._id, pollId, optionIds, 'user-id');
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const polls = (currentBoard.polls || []).map(p => p.id === pollId ? updatedPoll : p);
+        set({ board: { ...currentBoard, polls } });
+        socketService.votePoll(pollId, optionIds, 'user-id');
+      }
+      return updatedPoll;
+    } catch (err) {
+      console.error('Failed to vote:', err);
+      return null;
+    }
+  },
+
+  closePoll: async (pollId, closed) => {
+    const { board, canEdit } = get();
+    if (!board || !canEdit) return null;
+    try {
+      const updatedPoll = await boardApi.closePoll(board._id, pollId, closed);
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const polls = (currentBoard.polls || []).map(p => p.id === pollId ? updatedPoll : p);
+        set({ board: { ...currentBoard, polls } });
+        socketService.closePoll(pollId, closed);
+      }
+      return updatedPoll;
+    } catch (err) {
+      console.error('Failed to close poll:', err);
+      return null;
+    }
+  },
+
+  deletePoll: async (pollId) => {
+    const { board, canEdit } = get();
+    if (!board || !canEdit) return false;
+    try {
+      await boardApi.deletePoll(board._id, pollId);
+      const { board: currentBoard } = get();
+      if (currentBoard) {
+        const polls = (currentBoard.polls || []).filter(p => p.id !== pollId);
+        set({ board: { ...currentBoard, polls }, selectedPollId: null });
+        socketService.deletePoll(pollId);
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to delete poll:', err);
+      return false;
+    }
+  },
+
+  updatePoll: (pollId, updates) => {
+    const { board } = get();
+    if (!board) return;
+    const polls = (board.polls || []).map(p => p.id === pollId ? { ...p, ...updates } : p);
+    set({ board: { ...board, polls } });
+    socketService.updatePoll(pollId, updates);
   },
 }));

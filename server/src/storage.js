@@ -43,6 +43,8 @@ class LocalBoard {
     this.collaborators = data.collaborators || [];
     this.layers = data.layers || [{ name: 'Layer 1', visible: true, locked: false, order: 0, elements: [] }];
     this.comments = data.comments || [];
+    this.snapshots = data.snapshots || [];
+    this.polls = data.polls || [];
     this.width = data.width || 3000;
     this.height = data.height || 2000;
     this.backgroundColor = data.backgroundColor || '#ffffff';
@@ -61,6 +63,8 @@ class LocalBoard {
       collaborators: this.collaborators,
       layers: this.layers,
       comments: this.comments,
+      snapshots: this.snapshots,
+      polls: this.polls,
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor,

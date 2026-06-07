@@ -40,6 +40,29 @@ const snapshotSchema = new mongoose.Schema({
   createdById: { type: String, required: true }
 });
 
+const pollOptionSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  text: { type: String, required: true },
+  votes: [{ type: String }]
+});
+
+const pollSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  targetType: { type: String, enum: ['element', 'canvas'], required: true },
+  targetId: { type: String, default: null },
+  x: { type: Number, required: true },
+  y: { type: Number, required: true },
+  question: { type: String, required: true },
+  options: [pollOptionSchema],
+  isMultipleChoice: { type: Boolean, default: false },
+  isAnonymous: { type: Boolean, default: false },
+  author: { type: String, required: true },
+  authorId: { type: String, required: true },
+  createdAt: { type: String, required: true },
+  closed: { type: Boolean, default: false },
+  closedAt: { type: String }
+});
+
 const boardSchema = new mongoose.Schema({
   name: { type: String, required: true, default: 'Untitled Board' },
   ownerId: { type: String, required: true },
@@ -47,6 +70,7 @@ const boardSchema = new mongoose.Schema({
   layers: [layerSchema],
   comments: [commentSchema],
   snapshots: [snapshotSchema],
+  polls: [pollSchema],
   width: { type: Number, default: 3000 },
   height: { type: Number, default: 2000 },
   backgroundColor: { type: String, default: '#ffffff' },

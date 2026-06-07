@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData } from '../types';
+import { CursorPosition, BoardElement, Layer, CanvasTransform, Comment, CommentReply, TaskCardData, Poll } from '../types';
 
 const SERVER_URL = '/';
 
@@ -125,6 +125,36 @@ class SocketService {
     }
   }
 
+  addPoll(poll: Poll): void {
+    if (this.boardId) {
+      this.socket?.emit('add-poll', { boardId: this.boardId, poll });
+    }
+  }
+
+  updatePoll(pollId: string, updates: Partial<Poll>): void {
+    if (this.boardId) {
+      this.socket?.emit('update-poll', { boardId: this.boardId, pollId, updates });
+    }
+  }
+
+  votePoll(pollId: string, optionIds: string | string[], userId: string): void {
+    if (this.boardId) {
+      this.socket?.emit('vote-poll', { boardId: this.boardId, pollId, optionIds, userId });
+    }
+  }
+
+  closePoll(pollId: string, closed: boolean): void {
+    if (this.boardId) {
+      this.socket?.emit('close-poll', { boardId: this.boardId, pollId, closed });
+    }
+  }
+
+  deletePoll(pollId: string): void {
+    if (this.boardId) {
+      this.socket?.emit('delete-poll', { boardId: this.boardId, pollId });
+    }
+  }
+
   onUserJoined(callback: (data: { socketId: string; username: string }) => void): void {
     this.socket?.on('user-joined', callback);
   }
@@ -199,6 +229,26 @@ class SocketService {
 
   onSnapshotRestored(callback: (data: { layers: Layer[] }) => void): void {
     this.socket?.on('snapshot-restored', callback);
+  }
+
+  onPollAdded(callback: (data: { poll: Poll }) => void): void {
+    this.socket?.on('poll-added', callback);
+  }
+
+  onPollUpdated(callback: (data: { pollId: string; updates: Partial<Poll> }) => void): void {
+    this.socket?.on('poll-updated', callback);
+  }
+
+  onPollVoted(callback: (data: { pollId: string; optionIds: string | string[]; userId: string }) => void): void {
+    this.socket?.on('poll-voted', callback);
+  }
+
+  onPollClosed(callback: (data: { pollId: string; closed: boolean }) => void): void {
+    this.socket?.on('poll-closed', callback);
+  }
+
+  onPollDeleted(callback: (data: { pollId: string }) => void): void {
+    this.socket?.on('poll-deleted', callback);
   }
 
   onError(callback: (data: { message: string }) => void): void {

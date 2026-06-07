@@ -153,6 +153,26 @@ function setupSocketHandlers(io) {
       socket.to(`board:${boardId}`).emit('snapshot-restored', { layers });
     });
 
+    socket.on('add-poll', ({ boardId, poll }) => {
+      socket.to(`board:${boardId}`).emit('poll-added', { poll });
+    });
+
+    socket.on('update-poll', ({ boardId, pollId, updates }) => {
+      socket.to(`board:${boardId}`).emit('poll-updated', { pollId, updates });
+    });
+
+    socket.on('vote-poll', ({ boardId, pollId, optionIds, userId }) => {
+      socket.to(`board:${boardId}`).emit('poll-voted', { pollId, optionIds, userId });
+    });
+
+    socket.on('close-poll', ({ boardId, pollId, closed }) => {
+      socket.to(`board:${boardId}`).emit('poll-closed', { pollId, closed });
+    });
+
+    socket.on('delete-poll', ({ boardId, pollId }) => {
+      socket.to(`board:${boardId}`).emit('poll-deleted', { pollId });
+    });
+
     socket.on('disconnect', () => {
       const pos = cursorPositions.get(socket.id);
       if (pos) {

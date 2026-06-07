@@ -52,6 +52,7 @@ export interface Board {
   layers: Layer[];
   comments: Comment[];
   snapshots: Snapshot[];
+  polls: Poll[];
   width: number;
   height: number;
   backgroundColor: string;
@@ -154,4 +155,27 @@ export interface Snapshot {
   createdAt: string;
   createdBy: string;
   createdById: string;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: string[];
+}
+
+export interface Poll {
+  id: string;
+  targetType: 'element' | 'canvas';
+  targetId: string | null;
+  x: number;
+  y: number;
+  question: string;
+  options: PollOption[];
+  isMultipleChoice: boolean;
+  isAnonymous: boolean;
+  author: string;
+  authorId: string;
+  createdAt: string;
+  closed: boolean;
+  closedAt?: string;
 }

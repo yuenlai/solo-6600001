@@ -449,4 +449,170 @@ router.delete('/:id/snapshots/:snapshotId', async (req, res) => {
   }
 });
 
+// Get all polls for a board
+router.get('/:id/polls', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    res.json(board.polls || []);
+  } catch (err) {
+    console.error('[Boards] Error fetching polls:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create a new poll
+router.post('/:id/polls', async (req, res) => {
+  try {
+    const { targetType, targetId, x, y, question, options, isMultipleChoice, isAnonymous, author, authorId } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    if (!question || !options || options.length < 2) {
+      return res.status(400).json({ error: 'Question and at least 2 options are required' });
+    }
+    
+    const newPoll = {
+      id: uuidv4(),
+      targetType: targetType || 'canvas',
+      targetId: targetId || null,
+      x: x || 0,
+      y: y || 0,
+      question,
+      options: options.map((text, index) => ({
+        id: uuidv4(),
+        text,
+        votes: []
+      })),
+      isMultipleChoice: isMultipleChoice || false,
+      isAnonymous: isAnonymous || false,
+      author: author || 'Anonymous',
+      authorId: authorId || 'anonymous',
+      createdAt: new Date().toISOString(),
+      closed: false
+    };
+    
+    const polls = board.polls || [];
+    polls.push(newPoll);
+    
+    const updatedBoard = await Board.findByIdAndUpdate(
+      req.params.id,
+      { polls },
+      { new: true }
+    );
+    
+    console.log(`[Boards] Created poll ${newPoll.id} for board ${req.params.id}`);
+    res.json(newPoll);
+  } catch (err) {
+    console.error('[Boards] Error creating poll:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Vote on a poll option
+router.post('/:id/polls/:pollId/vote', async (req, res) => {
+  try {
+    const { optionIds, userId } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const polls = board.polls || [];
+    const pollIndex = polls.findIndex(p => p.id === req.params.pollId);
+    
+    if (pollIndex < 0) return res.status(404).json({ error: 'Poll not found' });
+    
+    const poll = polls[pollIndex];
+    
+    if (poll.closed) {
+      return res.status(400).json({ error: 'Poll is closed' });
+    }
+    
+    const optionIdArray = Array.isArray(optionIds) ? optionIds : [optionIds];
+    
+    if (!poll.isMultipleChoice && optionIdArray.length > 1) {
+      return res.status(400).json({ error: 'This poll only allows one choice' });
+    }
+    
+    poll.options = poll.options.map(option => {
+      const hasVoted = option.votes.includes(userId);
+      const isSelected = optionIdArray.includes(option.id);
+      
+      if (isSelected && !hasVoted) {
+        return { ...option, votes: [...option.votes, userId] };
+      } else if (!isSelected && hasVoted && poll.isMultipleChoice) {
+        return { ...option, votes: option.votes.filter(v => v !== userId) };
+      }
+      return option;
+    });
+    
+    if (!poll.isMultipleChoice) {
+      poll.options = poll.options.map(option => {
+        if (!optionIdArray.includes(option.id)) {
+          return { ...option, votes: option.votes.filter(v => v !== userId) };
+        }
+        return option;
+      });
+    }
+    
+    polls[pollIndex] = poll;
+    
+    await Board.findByIdAndUpdate(req.params.id, { polls });
+    
+    console.log(`[Boards] Recorded vote for poll ${req.params.pollId}`);
+    res.json(poll);
+  } catch (err) {
+    console.error('[Boards] Error voting on poll:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Close a poll
+router.patch('/:id/polls/:pollId/close', async (req, res) => {
+  try {
+    const { closed } = req.body;
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const polls = board.polls || [];
+    const pollIndex = polls.findIndex(p => p.id === req.params.pollId);
+    
+    if (pollIndex < 0) return res.status(404).json({ error: 'Poll not found' });
+    
+    polls[pollIndex].closed = closed !== undefined ? closed : true;
+    if (polls[pollIndex].closed) {
+      polls[pollIndex].closedAt = new Date().toISOString();
+    }
+    
+    await Board.findByIdAndUpdate(req.params.id, { polls });
+    
+    console.log(`[Boards] ${polls[pollIndex].closed ? 'Closed' : 'Opened'} poll ${req.params.pollId}`);
+    res.json(polls[pollIndex]);
+  } catch (err) {
+    console.error('[Boards] Error closing poll:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a poll
+router.delete('/:id/polls/:pollId', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    
+    const polls = (board.polls || []).filter(p => p.id !== req.params.pollId);
+    
+    await Board.findByIdAndUpdate(req.params.id, { polls });
+    
+    console.log(`[Boards] Deleted poll ${req.params.pollId} for board ${req.params.id}`);
+    res.json({ message: 'Poll deleted' });
+  } catch (err) {
+    console.error('[Boards] Error deleting poll:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

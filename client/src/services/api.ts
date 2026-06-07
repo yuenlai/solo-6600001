@@ -1,4 +1,4 @@
-import { Board, Template, SharePermission, ShareResult, Comment, CommentReply, Snapshot } from '../types';
+import { Board, Template, SharePermission, ShareResult, Comment, CommentReply, Snapshot, Poll } from '../types';
 
 const API_BASE_URL = '/api/boards';
 const TEMPLATE_API_URL = '/api/templates';
@@ -199,6 +199,63 @@ export const boardApi = {
     return response.ok;
   },
 
+  async getPolls(boardId: string): Promise<Poll[]> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/polls`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch polls');
+    }
+    return response.json();
+  },
+
+  async createPoll(boardId: string, pollData: Omit<Poll, 'id' | 'createdAt' | 'closed'> & { options: string[] }): Promise<Poll> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/polls`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pollData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create poll');
+    }
+    return response.json();
+  },
+
+  async votePoll(boardId: string, pollId: string, optionIds: string | string[], userId: string): Promise<Poll> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/polls/${pollId}/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ optionIds, userId }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to vote');
+    }
+    return response.json();
+  },
+
+  async closePoll(boardId: string, pollId: string, closed: boolean): Promise<Poll> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/polls/${pollId}/close`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ closed }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to close poll');
+    }
+    return response.json();
+  },
+
+  async deletePoll(boardId: string, pollId: string): Promise<boolean> {
+    const response = await fetch(`${API_BASE_URL}/${boardId}/polls/${pollId}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to delete poll');
+    }
+    return response.ok;
+  },
+
   getMockBoards(): Board[] {
     const now = new Date().toISOString();
     const yesterday = new Date(Date.now() - 86400000).toISOString();
@@ -214,6 +271,7 @@ export const boardApi = {
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
         snapshots: [],
+        polls: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#f5f5f5',
@@ -231,6 +289,7 @@ export const boardApi = {
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
         snapshots: [],
+        polls: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#ffffff',
@@ -248,6 +307,7 @@ export const boardApi = {
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
         snapshots: [],
+        polls: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#f0f8ff',
@@ -265,6 +325,7 @@ export const boardApi = {
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
         snapshots: [],
+        polls: [],
         width: 3000,
         height: 2000,
         backgroundColor: '#fff8e1',
@@ -287,6 +348,7 @@ export const boardApi = {
       layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
       comments: [],
       snapshots: [],
+      polls: [],
       width: 3000,
       height: 2000,
       backgroundColor: '#ffffff',
@@ -359,6 +421,7 @@ const createMockBoardFromTemplate = (
     layers: template.layers || [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
     comments: [],
     snapshots: [],
+    polls: [],
     width: template.width,
     height: template.height,
     backgroundColor: template.backgroundColor,

@@ -6,6 +6,8 @@ import { BoardElement, Comment } from '../types';
 import { CommentPanel } from './CommentPanel';
 import { AddCommentModal } from './AddCommentModal';
 import { TaskCard, TaskCardEditor } from './TaskCard';
+import { VotePoll } from './VotePoll';
+import { CreatePollModal } from './CreatePollModal';
 
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -28,7 +30,8 @@ export const WhiteboardCanvas: React.FC = () => {
     currentPresentationStepIndex,
     showPresentationPanel,
     showTaskCardEditor,
-    setShowTaskCardEditor
+    setShowTaskCardEditor,
+    loadPolls
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -292,7 +295,84 @@ export const WhiteboardCanvas: React.FC = () => {
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, []);
 
+  // Load polls and setup socket listeners
+  useEffect(() => {
+    if (!board) return;
+    
+    loadPolls();
+
+    socketService.onPollAdded(({ poll }) => {
+      const { board: currentBoard, setPolls } = useWhiteboardStore.getState();
+      if (currentBoard) {
+        const polls = [...(currentBoard.polls || []), poll];
+        setPolls(polls);
+      }
+    });
+
+    socketService.onPollUpdated(({ pollId, updates }) => {
+      const { board: currentBoard, setPolls } = useWhiteboardStore.getState();
+      if (currentBoard) {
+        const polls = (currentBoard.polls || []).map(p => p.id === pollId ? { ...p, ...updates } : p);
+        setPolls(polls);
+      }
+    });
+
+    socketService.onPollVoted(({ pollId, optionIds, userId }) => {
+      const { board: currentBoard, setPolls } = useWhiteboardStore.getState();
+      if (currentBoard) {
+        const polls = (currentBoard.polls || []).map(poll => {
+          if (poll.id !== pollId) return poll;
+          const optionIdArray = Array.isArray(optionIds) ? optionIds : [optionIds];
+          const updatedOptions = poll.options.map(option => {
+            const hasVoted = option.votes.includes(userId);
+            const isSelected = optionIdArray.includes(option.id);
+            if (isSelected && !hasVoted) {
+              return { ...option, votes: [...option.votes, userId] };
+            } else if (!isSelected && hasVoted && poll.isMultipleChoice) {
+              return { ...option, votes: option.votes.filter(v => v !== userId) };
+            } else if (!poll.isMultipleChoice && !isSelected) {
+              return { ...option, votes: option.votes.filter(v => v !== userId) };
+            }
+            return option;
+          });
+          return { ...poll, options: updatedOptions };
+        });
+        setPolls(polls);
+      }
+    });
+
+    socketService.onPollClosed(({ pollId, closed }) => {
+      const { board: currentBoard, setPolls } = useWhiteboardStore.getState();
+      if (currentBoard) {
+        const polls = (currentBoard.polls || []).map(p => {
+          if (p.id === pollId) {
+            return { ...p, closed, closedAt: closed ? new Date().toISOString() : undefined };
+          }
+          return p;
+        });
+        setPolls(polls);
+      }
+    });
+
+    socketService.onPollDeleted(({ pollId }) => {
+      const { board: currentBoard, setPolls } = useWhiteboardStore.getState();
+      if (currentBoard) {
+        const polls = (currentBoard.polls || []).filter(p => p.id !== pollId);
+        setPolls(polls);
+      }
+    });
+
+    return () => {
+      socketService.off('poll-added');
+      socketService.off('poll-updated');
+      socketService.off('poll-voted');
+      socketService.off('poll-closed');
+      socketService.off('poll-deleted');
+    };
+  }, [board?._id, loadPolls]);
+
   const comments = board?.comments || [];
+  const polls = board?.polls || [];
   const currentStep = presentationSteps[currentPresentationStepIndex];
   const showStepOverlay = (showPresentationPanel || isPresentationMode) && presentationSteps.length > 0;
 
@@ -439,7 +519,24 @@ export const WhiteboardCanvas: React.FC = () => {
           ))
       ))}
 
+      {polls.map((poll) => (
+        <div
+          key={poll.id}
+          style={{
+            position: 'absolute',
+            left: poll.x * canvasTransform.scale + canvasTransform.translateX,
+            top: poll.y * canvasTransform.scale + canvasTransform.translateY,
+            transform: `scale(${canvasTransform.scale})`,
+            transformOrigin: 'top left',
+            zIndex: 100
+          }}
+        >
+          <VotePoll poll={poll} />
+        </div>
+      ))}
+
       {showCommentPanel && <CommentPanel />}
+      <CreatePollModal />
 
       {showTaskCardEditor && (
         <TaskCardEditor
