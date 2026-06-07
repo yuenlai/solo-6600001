@@ -685,7 +685,7 @@ const App: React.FC = () => {
         )}
       </div>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {canEdit && <Toolbar />}
+        <Toolbar />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <WhiteboardCanvas />
           <CursorOverlay />

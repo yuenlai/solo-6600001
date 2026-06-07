@@ -142,6 +142,17 @@ export const CommentPanel: React.FC = () => {
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         <span style={{ fontWeight: 600, fontSize: '14px' }}>{comment.author}</span>
+                        {comment.isGuest && (
+                          <span style={{
+                            fontSize: '10px',
+                            padding: '1px 5px',
+                            background: '#9e9e9e',
+                            color: '#fff',
+                            borderRadius: '8px'
+                          }}>
+                            访客
+                          </span>
+                        )}
                         <span style={{ fontSize: '12px', color: '#999' }}>{formatDate(comment.createdAt)}</span>
                         {comment.resolved && (
                           <span style={{
@@ -235,6 +246,17 @@ export const CommentPanel: React.FC = () => {
             <div style={{ marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <span style={{ fontWeight: 600, fontSize: '13px' }}>{selectedComment.author}</span>
+                {selectedComment.isGuest && (
+                  <span style={{
+                    fontSize: '10px',
+                    padding: '1px 5px',
+                    background: '#9e9e9e',
+                    color: '#fff',
+                    borderRadius: '8px'
+                  }}>
+                    访客
+                  </span>
+                )}
                 <span style={{ fontSize: '11px', color: '#999' }}>{formatDate(selectedComment.createdAt)}</span>
               </div>
               <p style={{ margin: 0, fontSize: '14px', color: '#333' }}>{selectedComment.content}</p>
@@ -246,6 +268,17 @@ export const CommentPanel: React.FC = () => {
                 <div key={reply.id} style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                     <span style={{ fontWeight: 600, fontSize: '12px' }}>{reply.author}</span>
+                    {reply.isGuest && (
+                      <span style={{
+                        fontSize: '9px',
+                        padding: '0px 4px',
+                        background: '#9e9e9e',
+                        color: '#fff',
+                        borderRadius: '6px'
+                      }}>
+                        访客
+                      </span>
+                    )}
                     <span style={{ fontSize: '11px', color: '#999' }}>{formatDate(reply.createdAt)}</span>
                   </div>
                   <p style={{ margin: 0, fontSize: '13px', color: '#555' }}>{reply.content}</p>

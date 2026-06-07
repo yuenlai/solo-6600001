@@ -240,7 +240,8 @@ router.post('/:id/comments', async (req, res) => {
       authorId: authorId || 'anonymous',
       createdAt: new Date().toISOString(),
       resolved: false,
-      replies: []
+      replies: [],
+      isGuest: req.body.isGuest || false
     };
     
     const comments = board.comments || [];
@@ -278,7 +279,8 @@ router.post('/:id/comments/:commentId/replies', async (req, res) => {
       content,
       author: author || 'Anonymous',
       authorId: authorId || 'anonymous',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      isGuest: req.body.isGuest || false
     };
     
     comments[commentIndex].replies.push(newReply);

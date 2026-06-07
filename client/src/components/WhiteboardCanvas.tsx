@@ -110,10 +110,9 @@ export const WhiteboardCanvas: React.FC = () => {
       return;
     }
 
-    if (!canEdit || isPresentationMode) return;
     const point = getCanvasPoint(e);
 
-    if (activeTool === 'comment') {
+    if (activeTool === 'comment' && !isPresentationMode) {
       const element = findElementAtPoint(point.x, point.y);
       setAddingComment({
         position: point,
@@ -122,6 +121,8 @@ export const WhiteboardCanvas: React.FC = () => {
       });
       return;
     }
+
+    if (!canEdit || isPresentationMode) return;
 
     isDrawingRef.current = true;
     startPosRef.current = point;
@@ -530,7 +531,7 @@ export const WhiteboardCanvas: React.FC = () => {
         style={{
           width: '100%',
           height: '100%',
-          cursor: !canEdit || isPresentationMode ? 'default' : activeTool === 'select' ? 'default' : activeTool === 'comment' ? 'pointer' : 'crosshair',
+          cursor: isPresentationMode ? 'default' : activeTool === 'comment' ? 'pointer' : !canEdit ? 'default' : activeTool === 'select' ? 'default' : 'crosshair',
           backgroundColor: board?.backgroundColor || '#f5f5f5'
         }}
         onMouseDown={handleMouseDown}
@@ -704,6 +705,45 @@ export const WhiteboardCanvas: React.FC = () => {
         />
       )}
       <ExportModal />
+
+      {!canEdit && (
+        <button
+          onClick={() => {
+            const { setActiveTool, activeTool } = useWhiteboardStore.getState();
+            setActiveTool(activeTool === 'comment' ? 'select' : 'comment');
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '24px',
+            right: '24px',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(102, 126, 234, 0.4)',
+            zIndex: 500,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(102, 126, 234, 0.4)';
+          }}
+          title="点击添加批注"
+        >
+          💬
+        </button>
+      )}
     </div>
   );
 };

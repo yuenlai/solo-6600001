@@ -18,27 +18,37 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
 export const Toolbar: React.FC = () => {
   const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost, showNoteGroupPanel, setShowNoteGroupPanel, showSearchPanel, setShowSearchPanel, setShowExportModal, showAssetPanel, setShowAssetPanel, assets } = useWhiteboardStore();
 
+  const renderToolButton = (tool: typeof tools[0]) => {
+    const isCommentTool = tool.type === 'comment';
+    const isDisabled = !canEdit && !isCommentTool;
+    
+    return (
+      <button
+        key={tool.type}
+        onClick={() => !isDisabled && setActiveTool(tool.type)}
+        title={tool.label}
+        style={{
+          width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+          background: activeTool === tool.type ? '#e3f2fd' : 'transparent',
+          cursor: isDisabled ? 'not-allowed' : 'pointer',
+          fontSize: '18px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          opacity: isDisabled ? 0.4 : 1
+        }}
+        disabled={isDisabled}
+      >
+        {tool.icon}
+      </button>
+    );
+  };
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: '8px',
       padding: '12px', background: '#fff', borderRadius: '8px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.15)', width: '60px', alignItems: 'center'
     }}>
-      {tools.map(tool => (
-        <button
-          key={tool.type}
-          onClick={() => setActiveTool(tool.type)}
-          title={tool.label}
-          style={{
-            width: '40px', height: '40px', border: 'none', borderRadius: '6px',
-            background: activeTool === tool.type ? '#e3f2fd' : 'transparent',
-            cursor: 'pointer', fontSize: '18px', display: 'flex',
-            alignItems: 'center', justifyContent: 'center'
-          }}
-        >
-          {tool.icon}
-        </button>
-      ))}
+      {tools.map(tool => renderToolButton(tool))}
       <div style={{ width: '100%', height: '1px', background: '#ddd' }} />
       <label title="描边颜色">
         <input type="color" value={strokeColor} onChange={e => setStrokeColor(e.target.value)}

@@ -14,8 +14,9 @@ export const AddCommentModal: React.FC<AddCommentModalProps> = ({
   targetId,
   onClose
 }) => {
-  const { addComment, username, canvasTransform, setSelectedCommentId, setShowCommentPanel } = useWhiteboardStore();
+  const { addComment, username, canvasTransform, setSelectedCommentId, setShowCommentPanel, canEdit } = useWhiteboardStore();
   const [content, setContent] = useState('');
+  const [guestName, setGuestName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -25,8 +26,14 @@ export const AddCommentModal: React.FC<AddCommentModalProps> = ({
 
   const handleSubmit = async () => {
     if (!content.trim() || submitting) return;
+    if (!canEdit && !guestName.trim()) {
+      return;
+    }
     
     setSubmitting(true);
+    
+    const isGuest = !canEdit;
+    const authorName = isGuest ? guestName.trim() : username;
     
     const commentData = {
       targetType,
@@ -34,8 +41,9 @@ export const AddCommentModal: React.FC<AddCommentModalProps> = ({
       x: position.x,
       y: position.y,
       content: content.trim(),
-      author: username,
-      authorId: username,
+      author: authorName,
+      authorId: isGuest ? `guest_${Date.now()}` : username,
+      isGuest,
     };
 
     const savedComment = await addComment(commentData);
@@ -68,7 +76,7 @@ export const AddCommentModal: React.FC<AddCommentModalProps> = ({
         style={{
           position: 'absolute',
           left: Math.min(modalX, window.innerWidth - 300),
-          top: Math.min(modalY, window.innerHeight - 200),
+          top: Math.min(modalY, window.innerHeight - 280),
           width: '280px',
           background: '#fff',
           borderRadius: '8px',
@@ -79,6 +87,34 @@ export const AddCommentModal: React.FC<AddCommentModalProps> = ({
         <div style={{ marginBottom: '12px', fontWeight: 600, fontSize: '14px' }}>
           {targetType === 'element' ? '对元素添加评论' : '对画布添加评论'}
         </div>
+        
+        {!canEdit && (
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+              访客昵称
+            </div>
+            <input
+              type="text"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              placeholder="请输入您的昵称"
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '13px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              maxLength={20}
+            />
+            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+              您正在以访客身份提交评论
+            </div>
+          </div>
+        )}
+        
         <textarea
           ref={inputRef}
           value={content}
@@ -119,14 +155,14 @@ export const AddCommentModal: React.FC<AddCommentModalProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!content.trim() || submitting}
+            disabled={!content.trim() || submitting || (!canEdit && !guestName.trim())}
             style={{
               padding: '6px 14px',
               border: 'none',
               borderRadius: '4px',
-              background: content.trim() && !submitting ? '#2196f3' : '#e0e0e0',
+              background: content.trim() && !submitting && (canEdit || guestName.trim()) ? '#2196f3' : '#e0e0e0',
               color: '#fff',
-              cursor: content.trim() && !submitting ? 'pointer' : 'not-allowed',
+              cursor: content.trim() && !submitting && (canEdit || guestName.trim()) ? 'pointer' : 'not-allowed',
               fontSize: '13px'
             }}
           >

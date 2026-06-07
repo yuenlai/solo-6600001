@@ -141,6 +141,7 @@ export interface CommentReply {
   author: string;
   authorId: string;
   createdAt: string;
+  isGuest?: boolean;
 }
 
 export interface Comment {
@@ -155,6 +156,7 @@ export interface Comment {
   createdAt: string;
   resolved: boolean;
   replies: CommentReply[];
+  isGuest?: boolean;
 }
 
 export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'task-card' | 'eraser' | 'comment';

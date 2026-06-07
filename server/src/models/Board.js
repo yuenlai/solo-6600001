@@ -5,7 +5,8 @@ const replySchema = new mongoose.Schema({
   content: { type: String, required: true },
   author: { type: String, required: true },
   authorId: { type: String, required: true },
-  createdAt: { type: String, required: true }
+  createdAt: { type: String, required: true },
+  isGuest: { type: Boolean, default: false }
 });
 
 const commentSchema = new mongoose.Schema({
@@ -19,7 +20,8 @@ const commentSchema = new mongoose.Schema({
   authorId: { type: String, required: true },
   createdAt: { type: String, required: true },
   resolved: { type: Boolean, default: false },
-  replies: [replySchema]
+  replies: [replySchema],
+  isGuest: { type: Boolean, default: false }
 });
 
 const layerSchema = new mongoose.Schema({
