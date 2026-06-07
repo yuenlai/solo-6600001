@@ -94,6 +94,18 @@ export interface Comment {
 
 export type ToolType = 'select' | 'pen' | 'rect' | 'circle' | 'line' | 'text' | 'sticky-note' | 'eraser' | 'comment';
 
+export interface PresentationStep {
+  id: string;
+  title: string;
+  description: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scale: number;
+  order: number;
+}
+
 export interface Template {
   _id: string;
   name: string;

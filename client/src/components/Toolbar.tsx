@@ -15,7 +15,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
 ];
 
 export const Toolbar: React.FC = () => {
-  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth } = useWhiteboardStore();
+  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel } = useWhiteboardStore();
 
   return (
     <div style={{
@@ -52,6 +52,19 @@ export const Toolbar: React.FC = () => {
         onChange={e => setStrokeWidth(Number(e.target.value))}
         title={`线宽: ${strokeWidth}`}
         style={{ width: '40px' }} />
+      <div style={{ width: '100%', height: '1px', background: '#ddd' }} />
+      <button
+        onClick={() => setShowPresentationPanel(!showPresentationPanel)}
+        title="演示模式"
+        style={{
+          width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+          background: showPresentationPanel ? '#e3f2fd' : 'transparent',
+          cursor: 'pointer', fontSize: '18px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center'
+        }}
+      >
+        🎬
+      </button>
     </div>
   );
 };

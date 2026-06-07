@@ -5,6 +5,7 @@ import { LayerPanel } from './components/LayerPanel';
 import { CursorOverlay } from './components/CursorOverlay';
 import { Dashboard } from './components/Dashboard';
 import { ShareModal } from './components/ShareModal';
+import { PresentationPanel } from './components/PresentationPanel';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
@@ -372,6 +373,7 @@ const App: React.FC = () => {
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <WhiteboardCanvas />
           <CursorOverlay />
+          <PresentationPanel />
         </div>
         {canEdit && <LayerPanel />}
       </div>

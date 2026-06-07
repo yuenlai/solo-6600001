@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
 
@@ -17,6 +17,11 @@ interface WhiteboardState {
   isShareAccess: boolean;
   selectedCommentId: string | null;
   showCommentPanel: boolean;
+  presentationSteps: PresentationStep[];
+  isPresentationMode: boolean;
+  currentPresentationStepIndex: number;
+  isPresentationPlaying: boolean;
+  showPresentationPanel: boolean;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -47,6 +52,17 @@ interface WhiteboardState {
   setComments: (comments: Comment[]) => void;
   setSelectedCommentId: (id: string | null) => void;
   setShowCommentPanel: (show: boolean) => void;
+  setPresentationSteps: (steps: PresentationStep[]) => void;
+  addPresentationStep: (step: Omit<PresentationStep, 'id'>) => void;
+  updatePresentationStep: (stepId: string, updates: Partial<PresentationStep>) => void;
+  deletePresentationStep: (stepId: string) => void;
+  reorderPresentationSteps: (steps: PresentationStep[]) => void;
+  setIsPresentationMode: (isMode: boolean) => void;
+  setCurrentPresentationStepIndex: (index: number) => void;
+  setIsPresentationPlaying: (isPlaying: boolean) => void;
+  setShowPresentationPanel: (show: boolean) => void;
+  goToNextPresentationStep: () => void;
+  goToPrevPresentationStep: () => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -63,6 +79,11 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   isShareAccess: false,
   selectedCommentId: null,
   showCommentPanel: false,
+  presentationSteps: [],
+  isPresentationMode: false,
+  currentPresentationStepIndex: 0,
+  isPresentationPlaying: false,
+  showPresentationPanel: false,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -278,4 +299,95 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
   setSelectedCommentId: (id) => set({ selectedCommentId: id }),
   setShowCommentPanel: (show) => set({ showCommentPanel: show }),
+
+  setPresentationSteps: (steps) => set({ presentationSteps: steps }),
+
+  addPresentationStep: (step) => {
+    const { presentationSteps, canEdit } = get();
+    if (!canEdit) return;
+    const newStep: PresentationStep = {
+      ...step,
+      id: Math.random().toString(36).substr(2, 9)
+    };
+    const steps = [...presentationSteps, newStep].sort((a, b) => a.order - b.order);
+    set({ presentationSteps: steps });
+  },
+
+  updatePresentationStep: (stepId, updates) => {
+    const { presentationSteps, canEdit } = get();
+    if (!canEdit) return;
+    const steps = presentationSteps.map(s =>
+      s.id === stepId ? { ...s, ...updates } : s
+    );
+    set({ presentationSteps: steps });
+  },
+
+  deletePresentationStep: (stepId) => {
+    const { presentationSteps, canEdit, currentPresentationStepIndex } = get();
+    if (!canEdit) return;
+    const steps = presentationSteps.filter(s => s.id !== stepId);
+    const newIndex = Math.min(currentPresentationStepIndex, Math.max(0, steps.length - 1));
+    set({ 
+      presentationSteps: steps,
+      currentPresentationStepIndex: newIndex
+    });
+  },
+
+  reorderPresentationSteps: (steps) => {
+    const { canEdit } = get();
+    if (!canEdit) return;
+    const reordered = steps.map((s, i) => ({ ...s, order: i }));
+    set({ presentationSteps: reordered });
+  },
+
+  setIsPresentationMode: (isMode) => {
+    if (!isMode) {
+      set({ 
+        isPresentationMode: false, 
+        isPresentationPlaying: false,
+        currentPresentationStepIndex: 0
+      });
+    } else {
+      set({ isPresentationMode: true });
+    }
+  },
+
+  setCurrentPresentationStepIndex: (index) => {
+    const { presentationSteps, board } = get();
+    if (index < 0 || index >= presentationSteps.length) return;
+    const step = presentationSteps[index];
+    if (step && board) {
+      const centerX = step.x + step.width / 2;
+      const centerY = step.y + step.height / 2;
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const translateX = rect.width / 2 - centerX * step.scale;
+        const translateY = rect.height / 2 - centerY * step.scale;
+        useWhiteboardStore.getState().setCanvasTransform({
+          scale: step.scale,
+          translateX,
+          translateY
+        });
+      }
+    }
+    set({ currentPresentationStepIndex: index });
+  },
+
+  setIsPresentationPlaying: (isPlaying) => set({ isPresentationPlaying: isPlaying }),
+  setShowPresentationPanel: (show) => set({ showPresentationPanel: show }),
+
+  goToNextPresentationStep: () => {
+    const { currentPresentationStepIndex, presentationSteps, setCurrentPresentationStepIndex } = get();
+    if (currentPresentationStepIndex < presentationSteps.length - 1) {
+      setCurrentPresentationStepIndex(currentPresentationStepIndex + 1);
+    }
+  },
+
+  goToPrevPresentationStep: () => {
+    const { currentPresentationStepIndex, setCurrentPresentationStepIndex } = get();
+    if (currentPresentationStepIndex > 0) {
+      setCurrentPresentationStepIndex(currentPresentationStepIndex - 1);
+    }
+  },
 }));

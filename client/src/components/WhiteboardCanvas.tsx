@@ -21,7 +21,11 @@ export const WhiteboardCanvas: React.FC = () => {
   const {
     board, activeTool, strokeColor, fillColor, strokeWidth,
     canvasTransform, addElement, canEdit, showCommentPanel, setShowCommentPanel,
-    setSelectedCommentId
+    setSelectedCommentId,
+    presentationSteps,
+    isPresentationMode,
+    currentPresentationStepIndex,
+    showPresentationPanel
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -72,7 +76,7 @@ export const WhiteboardCanvas: React.FC = () => {
   }, [board]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canEdit) return;
+    if (!canEdit || isPresentationMode) return;
     const point = getCanvasPoint(e);
 
     if (activeTool === 'comment') {
@@ -270,6 +274,8 @@ export const WhiteboardCanvas: React.FC = () => {
   }, []);
 
   const comments = board?.comments || [];
+  const currentStep = presentationSteps[currentPresentationStepIndex];
+  const showStepOverlay = (showPresentationPanel || isPresentationMode) && presentationSteps.length > 0;
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -278,7 +284,7 @@ export const WhiteboardCanvas: React.FC = () => {
         style={{
           width: '100%',
           height: '100%',
-          cursor: !canEdit ? 'default' : activeTool === 'select' ? 'default' : activeTool === 'comment' ? 'pointer' : 'crosshair',
+          cursor: !canEdit || isPresentationMode ? 'default' : activeTool === 'select' ? 'default' : activeTool === 'comment' ? 'pointer' : 'crosshair',
           backgroundColor: board?.backgroundColor || '#f5f5f5'
         }}
         onMouseDown={handleMouseDown}
@@ -286,6 +292,86 @@ export const WhiteboardCanvas: React.FC = () => {
         onMouseUp={handleMouseUp}
         onMouseLeave={() => { isDrawingRef.current = false; }}
       />
+
+      {showStepOverlay && !isPresentationMode && presentationSteps.map((step, index) => (
+        <div
+          key={step.id}
+          style={{
+            position: 'absolute',
+            left: step.x * canvasTransform.scale + canvasTransform.translateX,
+            top: step.y * canvasTransform.scale + canvasTransform.translateY,
+            width: step.width * canvasTransform.scale,
+            height: step.height * canvasTransform.scale,
+            border: `2px dashed ${index === currentPresentationStepIndex ? '#667eea' : '#9ca3af'}`,
+            borderRadius: '8px',
+            pointerEvents: 'none',
+            zIndex: 50,
+            boxShadow: index === currentPresentationStepIndex ? '0 0 0 2px rgba(102, 126, 234, 0.3)' : 'none',
+            transition: 'all 0.2s'
+          }}
+        >
+          <div style={{
+            position: 'absolute',
+            top: '-28px',
+            left: '-2px',
+            padding: '4px 10px',
+            background: index === currentPresentationStepIndex ? '#667eea' : '#9ca3af',
+            color: '#fff',
+            fontSize: '12px',
+            borderRadius: '4px 4px 0 0',
+            fontWeight: 'bold',
+            whiteSpace: 'nowrap'
+          }}>
+            {index + 1}. {step.title}
+          </div>
+        </div>
+      ))}
+
+      {isPresentationMode && currentStep && (
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 50
+        }}>
+          <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
+            <defs>
+              <mask id="presentation-mask">
+                <rect width="100%" height="100%" fill="white" />
+                <rect
+                  x={currentStep.x * canvasTransform.scale + canvasTransform.translateX}
+                  y={currentStep.y * canvasTransform.scale + canvasTransform.translateY}
+                  width={currentStep.width * canvasTransform.scale}
+                  height={currentStep.height * canvasTransform.scale}
+                  fill="black"
+                  rx="8"
+                  ry="8"
+                />
+              </mask>
+            </defs>
+            <rect
+              width="100%"
+              height="100%"
+              fill="rgba(0, 0, 0, 0.6)"
+              mask="url(#presentation-mask)"
+            />
+            <rect
+              x={currentStep.x * canvasTransform.scale + canvasTransform.translateX}
+              y={currentStep.y * canvasTransform.scale + canvasTransform.translateY}
+              width={currentStep.width * canvasTransform.scale}
+              height={currentStep.height * canvasTransform.scale}
+              fill="none"
+              stroke="#667eea"
+              strokeWidth="3"
+              rx="8"
+              ry="8"
+            />
+          </svg>
+        </div>
+      )}
       
       {comments.map((comment) => (
         <div
