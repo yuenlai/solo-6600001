@@ -8,6 +8,7 @@ import { ShareModal } from './components/ShareModal';
 import { PresentationPanel } from './components/PresentationPanel';
 import { MeetingMinutes } from './components/MeetingMinutes';
 import { SnapshotHistoryPanel } from './components/SnapshotHistoryPanel';
+import { SearchPanel } from './components/SearchPanel';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
@@ -495,6 +496,7 @@ const App: React.FC = () => {
           <PresentationPanel />
           <MeetingMinutes />
           <SnapshotHistoryPanel />
+          <SearchPanel />
         </div>
         {canEdit && <LayerPanel />}
       </div>

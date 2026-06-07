@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
@@ -37,6 +37,10 @@ interface WhiteboardState {
   noteGroups: NoteGroup[];
   showNoteGroupPanel: boolean;
   groupingSimilarityThreshold: number;
+  showSearchPanel: boolean;
+  searchQuery: string;
+  searchResults: SearchResult[];
+  selectedSearchResultId: string | null;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -117,6 +121,12 @@ interface WhiteboardState {
   toggleGroupCollapse: (groupId: string) => void;
   clearAllGroups: () => void;
   mergeNoteGroups: (groupId1: string, groupId2: string) => void;
+  setShowSearchPanel: (show: boolean) => void;
+  setSearchQuery: (query: string) => void;
+  setSearchResults: (results: SearchResult[]) => void;
+  setSelectedSearchResultId: (id: string | null) => void;
+  performSearch: (query: string) => void;
+  navigateToSearchResult: (result: SearchResult) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -156,6 +166,10 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   noteGroups: [],
   showNoteGroupPanel: false,
   groupingSimilarityThreshold: 0.2,
+  showSearchPanel: false,
+  searchQuery: '',
+  searchResults: [],
+  selectedSearchResultId: null,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -841,5 +855,99 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     const merged = mergeGroups(group1, group2);
     const groups = noteGroups.filter(g => g.id !== groupId1 && g.id !== groupId2);
     set({ noteGroups: [...groups, merged] });
+  },
+
+  setShowSearchPanel: (show) => set({ showSearchPanel: show }),
+
+  setSearchQuery: (query) => set({ searchQuery: query }),
+
+  setSearchResults: (results) => set({ searchResults: results }),
+
+  setSelectedSearchResultId: (id) => set({ selectedSearchResultId: id }),
+
+  performSearch: (query) => {
+    const { board } = get();
+    if (!board || !query.trim()) {
+      set({ searchResults: [], searchQuery: query });
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const results: SearchResult[] = [];
+
+    board.layers.forEach((layer, layerIndex) => {
+      if (layer.name.toLowerCase().includes(lowerQuery)) {
+        const firstElement = layer.elements[0];
+        results.push({
+          id: `layer-${layerIndex}`,
+          type: 'layer',
+          layerIndex,
+          layerName: layer.name,
+          text: layer.name,
+          matchedText: layer.name,
+          x: firstElement?.x || 0,
+          y: firstElement?.y || 0,
+          width: firstElement?.width || 100,
+          height: firstElement?.height || 100,
+        });
+      }
+
+      layer.elements.forEach((element) => {
+        let textContent = '';
+        let matchedText = '';
+
+        if (element.type === 'text' || element.type === 'sticky-note') {
+          textContent = element.text || '';
+          if (textContent.toLowerCase().includes(lowerQuery)) {
+            matchedText = textContent;
+          }
+        } else if (element.type === 'task-card' && element.taskData) {
+          const taskText = `${element.taskData.title || ''} ${element.taskData.description || ''}`;
+          if (taskText.toLowerCase().includes(lowerQuery)) {
+            textContent = taskText;
+            matchedText = element.taskData.title || element.taskData.description || '';
+          }
+        }
+
+        if (matchedText) {
+          results.push({
+            id: `element-${element.id}`,
+            type: 'element',
+            elementType: element.type,
+            layerIndex,
+            layerName: layer.name,
+            elementId: element.id,
+            text: textContent,
+            matchedText,
+            x: element.x,
+            y: element.y,
+            width: element.width,
+            height: element.height,
+          });
+        }
+      });
+    });
+
+    set({ searchResults: results, searchQuery: query });
+  },
+
+  navigateToSearchResult: (result) => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const centerX = result.x + (result.width || 100) / 2;
+    const centerY = result.y + (result.height || 100) / 2;
+    const scale = Math.min(1.5, 1);
+    const translateX = rect.width / 2 - centerX * scale;
+    const translateY = rect.height / 2 - centerY * scale;
+
+    useWhiteboardStore.getState().setCanvasTransform({
+      scale,
+      translateX,
+      translateY,
+    });
+
+    set({ selectedSearchResultId: result.id });
   },
 }));

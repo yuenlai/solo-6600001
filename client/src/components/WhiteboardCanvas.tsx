@@ -38,7 +38,9 @@ export const WhiteboardCanvas: React.FC = () => {
     setCanvasTransform,
     followState,
     stopFollowingHost,
-    noteGroups
+    noteGroups,
+    searchResults,
+    selectedSearchResultId,
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -329,9 +331,62 @@ export const WhiteboardCanvas: React.FC = () => {
           ctx.restore();
         });
       });
+
+      if (searchResults.length > 0) {
+        searchResults.forEach((result) => {
+          if (result.type === 'element' && result.elementId) {
+            const isSelected = selectedSearchResultId === result.id;
+            ctx.save();
+            ctx.strokeStyle = isSelected ? '#2196f3' : 'rgba(33, 150, 243, 0.5)';
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.setLineDash(isSelected ? [] : [5, 5]);
+            
+            const x = result.x;
+            const y = result.y;
+            const w = result.width || 100;
+            const h = result.height || 50;
+            
+            if (result.elementType === 'circle') {
+              const rx = w / 2;
+              const ry = h / 2;
+              ctx.beginPath();
+              ctx.ellipse(x, y, rx + 8, ry + 8, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            } else if (result.elementType === 'text') {
+              ctx.beginPath();
+              ctx.roundRect(x - 4, y - 20, Math.max(w, 60) + 8, 28, 4);
+              ctx.stroke();
+            } else {
+              ctx.beginPath();
+              ctx.roundRect(x - 4, y - 4, w + 8, h + 8, 6);
+              ctx.stroke();
+            }
+            
+            if (isSelected) {
+              ctx.fillStyle = 'rgba(33, 150, 243, 0.1)';
+              if (result.elementType === 'circle') {
+                const rx = w / 2;
+                const ry = h / 2;
+                ctx.beginPath();
+                ctx.ellipse(x, y, rx + 8, ry + 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+              } else if (result.elementType === 'text') {
+                ctx.beginPath();
+                ctx.roundRect(x - 4, y - 20, Math.max(w, 60) + 8, 28, 4);
+                ctx.fill();
+              } else {
+                ctx.beginPath();
+                ctx.roundRect(x - 4, y - 4, w + 8, h + 8, 6);
+                ctx.fill();
+              }
+            }
+            ctx.restore();
+          }
+        });
+      }
     }
     ctx.restore();
-  }, [board, canvasTransform]);
+  }, [board, canvasTransform, searchResults, selectedSearchResultId]);
 
   // Handle wheel zoom
   useEffect(() => {

@@ -211,3 +211,18 @@ export interface GroupingResult {
   groups: NoteGroup[];
   ungroupedElementIds: string[];
 }
+
+export interface SearchResult {
+  id: string;
+  type: 'element' | 'layer';
+  elementType?: BoardElement['type'];
+  layerIndex: number;
+  layerName: string;
+  elementId?: string;
+  text: string;
+  matchedText: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+}
