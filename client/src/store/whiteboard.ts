@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi } from '../services/api';
+import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
 
 interface WhiteboardState {
   board: Board | null;
@@ -33,6 +34,9 @@ interface WhiteboardState {
   hostInfo: HostInfo | null;
   followState: FollowState;
   isHost: boolean;
+  noteGroups: NoteGroup[];
+  showNoteGroupPanel: boolean;
+  groupingSimilarityThreshold: number;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -100,6 +104,19 @@ interface WhiteboardState {
   startFollowingHost: (hostSocketId: string, hostUsername: string) => void;
   stopFollowingHost: () => void;
   applyHostView: (transform: CanvasTransform) => void;
+  setNoteGroups: (groups: NoteGroup[]) => void;
+  setShowNoteGroupPanel: (show: boolean) => void;
+  setGroupingSimilarityThreshold: (threshold: number) => void;
+  autoGroupNotes: () => void;
+  autoArrangeGroups: () => void;
+  addNoteGroup: (group: NoteGroup) => void;
+  updateNoteGroup: (groupId: string, updates: Partial<NoteGroup>) => void;
+  deleteNoteGroup: (groupId: string, keepElements?: boolean) => void;
+  addElementToGroup: (groupId: string, elementId: string) => void;
+  removeElementFromGroup: (groupId: string, elementId: string) => void;
+  toggleGroupCollapse: (groupId: string) => void;
+  clearAllGroups: () => void;
+  mergeNoteGroups: (groupId1: string, groupId2: string) => void;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -136,6 +153,9 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     hostUsername: null
   },
   isHost: false,
+  noteGroups: [],
+  showNoteGroupPanel: false,
+  groupingSimilarityThreshold: 0.2,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -708,5 +728,118 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     const { followState } = get();
     if (!followState.isFollowing) return;
     set({ canvasTransform: transform });
+  },
+
+  setNoteGroups: (groups) => set({ noteGroups: groups }),
+
+  setShowNoteGroupPanel: (show) => set({ showNoteGroupPanel: show }),
+
+  setGroupingSimilarityThreshold: (threshold) => set({ groupingSimilarityThreshold: threshold }),
+
+  autoGroupNotes: () => {
+    const { board, groupingSimilarityThreshold, canEdit } = get();
+    if (!board || !canEdit) return;
+
+    const allElements = board.layers.flatMap(layer => layer.elements);
+    const result = groupStickyNotes(allElements, groupingSimilarityThreshold);
+    set({ noteGroups: result.groups });
+  },
+
+  autoArrangeGroups: () => {
+    const { board, noteGroups, canEdit, activeLayerIndex } = get();
+    if (!board || !canEdit || noteGroups.length === 0) return;
+
+    const allElements = board.layers.flatMap(layer => layer.elements);
+    const { groups: arrangedGroups, elements: arrangedElements } = autoArrangeGroupsUtil(noteGroups, allElements);
+
+    const layers = [...board.layers];
+    layers[activeLayerIndex] = {
+      ...layers[activeLayerIndex],
+      elements: layers[activeLayerIndex].elements.map(el => {
+        const updated = arrangedElements.find(e => e.id === el.id);
+        return updated || el;
+      })
+    };
+
+    set({
+      board: { ...board, layers },
+      noteGroups: arrangedGroups
+    });
+
+    arrangedGroups.forEach(group => {
+      group.elementIds.forEach(elementId => {
+        const element = arrangedElements.find(e => e.id === elementId);
+        if (element) {
+          socketService.updateElement(elementId, { x: element.x, y: element.y }, activeLayerIndex);
+        }
+      });
+    });
+  },
+
+  addNoteGroup: (group) => {
+    const { noteGroups, canEdit } = get();
+    if (!canEdit) return;
+    set({ noteGroups: [...noteGroups, group] });
+  },
+
+  updateNoteGroup: (groupId, updates) => {
+    const { noteGroups, canEdit } = get();
+    if (!canEdit) return;
+    const groups = noteGroups.map(g =>
+      g.id === groupId ? { ...g, ...updates } : g
+    );
+    set({ noteGroups: groups });
+  },
+
+  deleteNoteGroup: (groupId, _keepElements = true) => {
+    const { noteGroups, canEdit } = get();
+    if (!canEdit) return;
+    const groups = noteGroups.filter(g => g.id !== groupId);
+    set({ noteGroups: groups });
+  },
+
+  addElementToGroup: (groupId, elementId) => {
+    const { noteGroups, canEdit } = get();
+    if (!canEdit) return;
+    const groups = noteGroups.map(g =>
+      g.id === groupId ? addToGroup(g, elementId) : g
+    );
+    set({ noteGroups: groups });
+  },
+
+  removeElementFromGroup: (groupId, elementId) => {
+    const { noteGroups, canEdit } = get();
+    if (!canEdit) return;
+    const groups = noteGroups.map(g =>
+      g.id === groupId ? removeFromGroup(g, elementId) : g
+    ).filter(g => g.elementIds.length > 0);
+    set({ noteGroups: groups });
+  },
+
+  toggleGroupCollapse: (groupId) => {
+    const { noteGroups, canEdit } = get();
+    if (!canEdit) return;
+    const groups = noteGroups.map(g =>
+      g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+    );
+    set({ noteGroups: groups });
+  },
+
+  clearAllGroups: () => {
+    const { canEdit } = get();
+    if (!canEdit) return;
+    set({ noteGroups: [] });
+  },
+
+  mergeNoteGroups: (groupId1, groupId2) => {
+    const { noteGroups, canEdit } = get();
+    if (!canEdit) return;
+    const group1 = noteGroups.find(g => g.id === groupId1);
+    const group2 = noteGroups.find(g => g.id === groupId2);
+    if (!group1 || !group2) return;
+
+    const merged = mergeGroups(group1, group2);
+    const groups = noteGroups.filter(g => g.id !== groupId1 && g.id !== groupId2);
+    set({ noteGroups: [...groups, merged] });
   },
 }));

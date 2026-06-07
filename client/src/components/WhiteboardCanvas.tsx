@@ -8,6 +8,7 @@ import { AddCommentModal } from './AddCommentModal';
 import { TaskCard, TaskCardEditor } from './TaskCard';
 import { VotePoll } from './VotePoll';
 import { CreatePollModal } from './CreatePollModal';
+import { NoteGroupPanel } from './NoteGroupPanel';
 
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,7 +37,8 @@ export const WhiteboardCanvas: React.FC = () => {
     loadPolls,
     setCanvasTransform,
     followState,
-    stopFollowingHost
+    stopFollowingHost,
+    noteGroups
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -245,6 +247,26 @@ export const WhiteboardCanvas: React.FC = () => {
     ctx.scale(canvasTransform.scale, canvasTransform.scale);
 
     if (board) {
+      noteGroups.forEach(group => {
+        ctx.save();
+        ctx.fillStyle = group.color;
+        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(group.x, group.y, group.width, group.collapsed ? 50 : group.height, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#374151';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillText(group.title, group.x + 16, group.y + 28);
+
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(`${group.elementIds.length} 个便签`, group.x + 16, group.y + 46);
+        ctx.restore();
+      });
+
       board.layers.forEach((layer) => {
         if (!layer.visible) return;
         layer.elements.forEach(el => {
@@ -580,6 +602,7 @@ export const WhiteboardCanvas: React.FC = () => {
 
       {showCommentPanel && <CommentPanel />}
       <CreatePollModal />
+      <NoteGroupPanel />
 
       {showTaskCardEditor && (
         <TaskCardEditor

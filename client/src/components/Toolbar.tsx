@@ -16,7 +16,7 @@ const tools: { type: ToolType; label: string; icon: string }[] = [
 ];
 
 export const Toolbar: React.FC = () => {
-  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost } = useWhiteboardStore();
+  const { activeTool, setActiveTool, strokeColor, setStrokeColor, fillColor, setFillColor, strokeWidth, setStrokeWidth, showPresentationPanel, setShowPresentationPanel, showMeetingMinutes, setShowMeetingMinutes, showSnapshotHistory, setShowSnapshotHistory, setShowCreatePollModal, canEdit, isHost, toggleHostMode, hostInfo, followState, startFollowingHost, stopFollowingHost, showNoteGroupPanel, setShowNoteGroupPanel } = useWhiteboardStore();
 
   return (
     <div style={{
@@ -104,6 +104,18 @@ export const Toolbar: React.FC = () => {
           🗳️
         </button>
       )}
+      <button
+        onClick={() => setShowNoteGroupPanel(!showNoteGroupPanel)}
+        title="便签分组"
+        style={{
+          width: '40px', height: '40px', border: 'none', borderRadius: '6px',
+          background: showNoteGroupPanel ? '#e3f2fd' : 'transparent',
+          cursor: 'pointer', fontSize: '18px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center'
+        }}
+      >
+        📁
+      </button>
       <div style={{ width: '100%', height: '1px', background: '#ddd' }} />
       {canEdit && (
         <button

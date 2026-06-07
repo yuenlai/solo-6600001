@@ -194,3 +194,20 @@ export interface Poll {
   closed: boolean;
   closedAt?: string;
 }
+
+export interface NoteGroup {
+  id: string;
+  title: string;
+  elementIds: string[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  collapsed: boolean;
+}
+
+export interface GroupingResult {
+  groups: NoteGroup[];
+  ungroupedElementIds: string[];
+}
