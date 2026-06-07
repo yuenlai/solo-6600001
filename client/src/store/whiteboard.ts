@@ -5,6 +5,7 @@ import { socketService } from '../services/socket';
 import { boardApi, notificationApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
 import { exportBoardToImage, downloadImage, exportPresets } from '../utils/exportImage';
+import { generateColorFromString } from '../utils/cursorUtils';
 
 interface WhiteboardState {
   board: Board | null;
@@ -342,7 +343,14 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
   updateCursor: (cursor) => {
     const cursors = new Map(get().cursors);
-    cursors.set(cursor.socketId, cursor);
+    const existingCursor = cursors.get(cursor.socketId);
+    const color = existingCursor?.color || generateColorFromString(cursor.socketId);
+    cursors.set(cursor.socketId, {
+      ...cursor,
+      color,
+      lastActiveAt: Date.now(),
+      isActive: true
+    });
     set({ cursors });
   },
 
@@ -354,7 +362,14 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
   setCursors: (cursorsList) => {
     const cursors = new Map();
-    cursorsList.forEach(c => cursors.set(c.socketId, c));
+    cursorsList.forEach(c => {
+      cursors.set(c.socketId, {
+        ...c,
+        color: c.color || generateColorFromString(c.socketId),
+        lastActiveAt: c.lastActiveAt || Date.now(),
+        isActive: c.isActive !== undefined ? c.isActive : true
+      });
+    });
     set({ cursors });
   },
 

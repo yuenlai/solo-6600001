@@ -113,6 +113,9 @@ export interface CursorPosition {
   x: number;
   y: number;
   isHost?: boolean;
+  color?: string;
+  lastActiveAt?: number;
+  isActive?: boolean;
 }
 
 export interface HostInfo {
