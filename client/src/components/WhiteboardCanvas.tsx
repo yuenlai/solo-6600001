@@ -13,6 +13,8 @@ import { ExportModal } from './ExportModal';
 
 const imageCache = new Map<string, HTMLImageElement>();
 
+type DragMode = 'none' | 'move' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | 'resize-n' | 'resize-s' | 'resize-w' | 'resize-e';
+
 export const WhiteboardCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
@@ -25,9 +27,13 @@ export const WhiteboardCanvas: React.FC = () => {
   const lastPanPosRef = useRef({ x: 0, y: 0, time: 0 });
   const animationFrameRef = useRef<number | null>(null);
   const spacePressedRef = useRef(false);
+  const dragModeRef = useRef<DragMode>('none');
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
+  const dragStartElementRef = useRef<BoardElement | null>(null);
   const [, forceUpdate] = useState({});
   const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [editingText, setEditingText] = useState<string>('');
 
   const [addingComment, setAddingComment] = useState<{
     position: { x: number; y: number };
@@ -37,7 +43,7 @@ export const WhiteboardCanvas: React.FC = () => {
 
   const {
     board, activeTool, strokeColor, fillColor, strokeWidth,
-    canvasTransform, addElement, canEdit, showCommentPanel, setShowCommentPanel,
+    canvasTransform, addElement, updateElement, deleteElement, canEdit, showCommentPanel, setShowCommentPanel,
     setSelectedCommentId,
     presentationSteps,
     isPresentationMode,
@@ -55,6 +61,10 @@ export const WhiteboardCanvas: React.FC = () => {
     resetView,
     zoomIn,
     zoomOut,
+    selectedElementId,
+    setSelectedElementId,
+    editingElementId,
+    setEditingElementId,
   } = useWhiteboardStore();
 
   const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -66,6 +76,46 @@ export const WhiteboardCanvas: React.FC = () => {
       y: (e.clientY - rect.top - canvasTransform.translateY) / canvasTransform.scale
     };
   }, [canvasTransform]);
+
+  const getSelectedElement = useCallback((): BoardElement | null => {
+    if (!board || !selectedElementId) return null;
+    for (let i = board.layers.length - 1; i >= 0; i--) {
+      const layer = board.layers[i];
+      if (!layer.visible) continue;
+      const el = layer.elements.find(e => e.id === selectedElementId);
+      if (el) return el;
+    }
+    return null;
+  }, [board, selectedElementId]);
+
+  const getElementBounds = useCallback((el: BoardElement) => {
+    let x = el.x, y = el.y, w = el.width || 0, h = el.height || 0;
+    if (el.type === 'circle') {
+      x = el.x - (el.width || 0) / 2;
+      y = el.y - (el.height || 0) / 2;
+    } else if (el.type === 'text') {
+      w = Math.max(w, 60);
+      h = Math.max(h, 24);
+      y = el.y - 20;
+    }
+    return { x, y, w, h };
+  }, []);
+
+  const getResizeHandleAtPoint = useCallback((el: BoardElement, x: number, y: number): DragMode => {
+    const { x: ex, y: ey, w, h } = getElementBounds(el);
+    const handleSize = 10 / canvasTransform.scale;
+    const halfHandle = handleSize / 2;
+
+    if (Math.abs(x - ex) < halfHandle && Math.abs(y - ey) < halfHandle) return 'resize-nw';
+    if (Math.abs(x - (ex + w)) < halfHandle && Math.abs(y - ey) < halfHandle) return 'resize-ne';
+    if (Math.abs(x - ex) < halfHandle && Math.abs(y - (ey + h)) < halfHandle) return 'resize-sw';
+    if (Math.abs(x - (ex + w)) < halfHandle && Math.abs(y - (ey + h)) < halfHandle) return 'resize-se';
+    if (Math.abs(y - ey) < halfHandle && x > ex && x < ex + w) return 'resize-n';
+    if (Math.abs(y - (ey + h)) < halfHandle && x > ex && x < ex + w) return 'resize-s';
+    if (Math.abs(x - ex) < halfHandle && y > ey && y < ey + h) return 'resize-w';
+    if (Math.abs(x - (ex + w)) < halfHandle && y > ey && y < ey + h) return 'resize-e';
+    return 'none';
+  }, [getElementBounds, canvasTransform.scale]);
 
   const findElementAtPoint = useCallback((x: number, y: number): BoardElement | null => {
     if (!board) return null;
@@ -146,10 +196,42 @@ export const WhiteboardCanvas: React.FC = () => {
 
     if (!canEdit || isPresentationMode) return;
 
+    if (activeTool === 'select') {
+      const selectedEl = getSelectedElement();
+      if (selectedEl) {
+        const resizeHandle = getResizeHandleAtPoint(selectedEl, point.x, point.y);
+        if (resizeHandle !== 'none') {
+          dragModeRef.current = resizeHandle;
+          dragStartPosRef.current = { x: point.x, y: point.y };
+          dragStartElementRef.current = { ...selectedEl };
+          return;
+        }
+        const bounds = getElementBounds(selectedEl);
+        if (point.x >= bounds.x && point.x <= bounds.x + bounds.w &&
+            point.y >= bounds.y && point.y <= bounds.y + bounds.h) {
+          dragModeRef.current = 'move';
+          dragStartPosRef.current = { x: point.x, y: point.y };
+          dragStartElementRef.current = { ...selectedEl };
+          return;
+        }
+      }
+
+      const element = findElementAtPoint(point.x, point.y);
+      if (element) {
+        setSelectedElementId(element.id);
+        dragModeRef.current = 'move';
+        dragStartPosRef.current = { x: point.x, y: point.y };
+        dragStartElementRef.current = { ...element };
+      } else {
+        setSelectedElementId(null);
+      }
+      return;
+    }
+
     isDrawingRef.current = true;
     startPosRef.current = point;
     currentPathRef.current = [point.x, point.y];
-  }, [canEdit, getCanvasPoint, activeTool, findElementAtPoint, canvasTransform, followState.isFollowing, stopFollowingHost]);
+  }, [canEdit, getCanvasPoint, activeTool, findElementAtPoint, canvasTransform, followState.isFollowing, stopFollowingHost, getSelectedElement, getResizeHandleAtPoint, getElementBounds, setSelectedElementId]);
 
   const applyInertia = useCallback(() => {
     const friction = 0.95;
@@ -209,6 +291,92 @@ export const WhiteboardCanvas: React.FC = () => {
       return;
     }
 
+    if (dragModeRef.current !== 'none' && dragStartElementRef.current && canEdit) {
+      const dx = point.x - dragStartPosRef.current.x;
+      const dy = point.y - dragStartPosRef.current.y;
+      const startEl = dragStartElementRef.current;
+      const updates: Partial<BoardElement> = {};
+
+      if (dragModeRef.current === 'move') {
+        if (startEl.type === 'circle') {
+          updates.x = startEl.x + dx;
+          updates.y = startEl.y + dy;
+        } else if (startEl.type === 'text') {
+          updates.x = startEl.x + dx;
+          updates.y = startEl.y + dy;
+        } else {
+          updates.x = startEl.x + dx;
+          updates.y = startEl.y + dy;
+        }
+      } else {
+        const bounds = getElementBounds(startEl);
+        let newX = bounds.x, newY = bounds.y, newW = bounds.w, newH = bounds.h;
+
+        switch (dragModeRef.current) {
+          case 'resize-nw':
+            newX = bounds.x + dx;
+            newY = bounds.y + dy;
+            newW = bounds.w - dx;
+            newH = bounds.h - dy;
+            break;
+          case 'resize-ne':
+            newY = bounds.y + dy;
+            newW = bounds.w + dx;
+            newH = bounds.h - dy;
+            break;
+          case 'resize-sw':
+            newX = bounds.x + dx;
+            newW = bounds.w - dx;
+            newH = bounds.h + dy;
+            break;
+          case 'resize-se':
+            newW = bounds.w + dx;
+            newH = bounds.h + dy;
+            break;
+          case 'resize-n':
+            newY = bounds.y + dy;
+            newH = bounds.h - dy;
+            break;
+          case 'resize-s':
+            newH = bounds.h + dy;
+            break;
+          case 'resize-w':
+            newX = bounds.x + dx;
+            newW = bounds.w - dx;
+            break;
+          case 'resize-e':
+            newW = bounds.w + dx;
+            break;
+        }
+
+        const minSize = 20;
+        if (newW < minSize) {
+          if (dragModeRef.current.includes('w')) newX = bounds.x + bounds.w - minSize;
+          newW = minSize;
+        }
+        if (newH < minSize) {
+          if (dragModeRef.current.includes('n')) newY = bounds.y + bounds.h - minSize;
+          newH = minSize;
+        }
+
+        if (startEl.type === 'circle') {
+          updates.x = newX + newW / 2;
+          updates.y = newY + newH / 2;
+          updates.width = newW;
+          updates.height = newH;
+        } else {
+          updates.x = newX;
+          updates.y = newY;
+          updates.width = newW;
+          updates.height = newH;
+        }
+      }
+
+      updateElement(startEl.id, updates);
+      forceUpdate({});
+      return;
+    }
+
     socketService.moveCursor(point.x, point.y);
 
     if (!isDrawingRef.current || !canEdit) {
@@ -217,13 +385,19 @@ export const WhiteboardCanvas: React.FC = () => {
     }
     currentPathRef.current.push(point.x, point.y);
     forceUpdate({});
-  }, [canEdit, getCanvasPoint, canvasTransform, setCanvasTransform]);
+  }, [canEdit, getCanvasPoint, canvasTransform, setCanvasTransform, updateElement, getElementBounds]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanningRef.current) {
       isPanningRef.current = false;
       setIsPanning(false);
       applyInertia();
+      return;
+    }
+
+    if (dragModeRef.current !== 'none') {
+      dragModeRef.current = 'none';
+      dragStartElementRef.current = null;
       return;
     }
 
@@ -304,6 +478,20 @@ export const WhiteboardCanvas: React.FC = () => {
     }
     currentPathRef.current = [];
   }, [activeTool, strokeColor, fillColor, strokeWidth, addElement, canEdit, getCanvasPoint]);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canEdit || isPresentationMode) return;
+    if (activeTool !== 'select') return;
+
+    const point = getCanvasPoint(e);
+    const element = findElementAtPoint(point.x, point.y);
+    
+    if (element && (element.type === 'text' || element.type === 'sticky-note')) {
+      setSelectedElementId(element.id);
+      setEditingElementId(element.id);
+      setEditingText(element.text || '');
+    }
+  }, [canEdit, isPresentationMode, activeTool, getCanvasPoint, findElementAtPoint, setSelectedElementId, setEditingElementId]);
 
   const handleCommentMarkerClick = (comment: Comment, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -489,6 +677,41 @@ export const WhiteboardCanvas: React.FC = () => {
         });
       }
 
+      if (selectedElementId && activeTool === 'select' && !editingElementId) {
+        const selectedEl = getSelectedElement();
+        if (selectedEl) {
+          const bounds = getElementBounds(selectedEl);
+          ctx.save();
+          ctx.strokeStyle = '#2196f3';
+          ctx.lineWidth = 2 / canvasTransform.scale;
+          ctx.setLineDash([6 / canvasTransform.scale, 4 / canvasTransform.scale]);
+          ctx.strokeRect(bounds.x - 4 / canvasTransform.scale, bounds.y - 4 / canvasTransform.scale, bounds.w + 8 / canvasTransform.scale, bounds.h + 8 / canvasTransform.scale);
+          ctx.setLineDash([]);
+
+          const handleSize = 8 / canvasTransform.scale;
+          const handles = [
+            { x: bounds.x, y: bounds.y },
+            { x: bounds.x + bounds.w, y: bounds.y },
+            { x: bounds.x, y: bounds.y + bounds.h },
+            { x: bounds.x + bounds.w, y: bounds.y + bounds.h },
+            { x: bounds.x + bounds.w / 2, y: bounds.y },
+            { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h },
+            { x: bounds.x, y: bounds.y + bounds.h / 2 },
+            { x: bounds.x + bounds.w, y: bounds.y + bounds.h / 2 },
+          ];
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#2196f3';
+          ctx.lineWidth = 1.5 / canvasTransform.scale;
+          handles.forEach(handle => {
+            ctx.beginPath();
+            ctx.rect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
+            ctx.fill();
+            ctx.stroke();
+          });
+          ctx.restore();
+        }
+      }
+
       if (canEdit && !isPresentationMode) {
         const mousePos = currentMousePosRef.current;
         const isDrawing = isDrawingRef.current;
@@ -616,7 +839,7 @@ export const WhiteboardCanvas: React.FC = () => {
       }
     }
     ctx.restore();
-  }, [board, canvasTransform, searchResults, selectedSearchResultId, activeTool, strokeColor, fillColor, strokeWidth, canEdit, isPresentationMode, isHoveringCanvas]);
+  }, [board, canvasTransform, searchResults, selectedSearchResultId, activeTool, strokeColor, fillColor, strokeWidth, canEdit, isPresentationMode, isHoveringCanvas, selectedElementId, editingElementId, getSelectedElement, getElementBounds]);
 
   const animateTransform = useCallback((target: { scale: number; translateX: number; translateY: number }) => {
     if (animationFrameRef.current) {
@@ -706,6 +929,26 @@ export const WhiteboardCanvas: React.FC = () => {
         return;
       }
 
+      if (e.code === 'Escape') {
+        if (editingElementId) {
+          setEditingElementId(null);
+          setEditingText('');
+          e.preventDefault();
+          return;
+        }
+        if (selectedElementId) {
+          setSelectedElementId(null);
+          e.preventDefault();
+          return;
+        }
+      }
+
+      if ((e.code === 'Delete' || e.code === 'Backspace') && selectedElementId && canEdit && !editingElementId) {
+        deleteElement(selectedElementId);
+        e.preventDefault();
+        return;
+      }
+
       if (e.code === 'Space' && !spacePressedRef.current) {
         e.preventDefault();
         spacePressedRef.current = true;
@@ -741,7 +984,7 @@ export const WhiteboardCanvas: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [resetView, zoomIn, zoomOut]);
+  }, [resetView, zoomIn, zoomOut, selectedElementId, editingElementId, canEdit, deleteElement, setSelectedElementId, setEditingElementId]);
 
   // Cleanup animation frame on unmount
   useEffect(() => {
@@ -852,7 +1095,55 @@ export const WhiteboardCanvas: React.FC = () => {
           isPanningRef.current = false;
           setIsHoveringCanvas(false);
         }}
+        onDoubleClick={handleDoubleClick}
       />
+
+      {editingElementId && (() => {
+        const el = getSelectedElement();
+        if (!el || (el.type !== 'text' && el.type !== 'sticky-note')) return null;
+        const bounds = getElementBounds(el);
+        return (
+          <textarea
+            autoFocus
+            value={editingText}
+            onChange={(e) => setEditingText(e.target.value)}
+            onBlur={() => {
+              updateElement(el.id, { text: editingText });
+              setEditingElementId(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                updateElement(el.id, { text: editingText });
+                setEditingElementId(null);
+              }
+              if (e.key === 'Escape') {
+                setEditingElementId(null);
+                setEditingText(el.text || '');
+              }
+            }}
+            style={{
+              position: 'absolute',
+              left: bounds.x * canvasTransform.scale + canvasTransform.translateX,
+              top: bounds.y * canvasTransform.scale + canvasTransform.translateY,
+              width: Math.max(bounds.w, 100) * canvasTransform.scale,
+              height: Math.max(bounds.h, 40) * canvasTransform.scale,
+              fontSize: (el.type === 'sticky-note' ? 14 : 16) * canvasTransform.scale,
+              fontFamily: 'sans-serif',
+              color: el.type === 'sticky-note' ? '#333' : (el.fill || '#000'),
+              backgroundColor: el.type === 'sticky-note' ? (el.fill || '#FFF59D') : 'transparent',
+              border: '2px solid #2196f3',
+              borderRadius: el.type === 'sticky-note' ? '0' : '4px',
+              padding: '4px 8px',
+              margin: 0,
+              resize: 'none',
+              outline: 'none',
+              zIndex: 1000,
+              lineHeight: '1.4',
+            }}
+          />
+        );
+      })()}
 
       {showStepOverlay && !isPresentationMode && presentationSteps.map((step, index) => (
         <div

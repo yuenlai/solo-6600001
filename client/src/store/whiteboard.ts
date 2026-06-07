@@ -60,6 +60,8 @@ interface WhiteboardState {
   showTimerPanel: boolean;
   timerState: TimerState;
   timerSettings: TimerSettings;
+  selectedElementId: string | null;
+  editingElementId: string | null;
 
   // Actions
   setBoard: (board: Board) => void;
@@ -188,6 +190,9 @@ interface WhiteboardState {
   prevTimerPhase: () => void;
   goToTimerPhase: (index: number) => void;
   syncTimerState: (state: TimerState) => void;
+  setSelectedElementId: (id: string | null) => void;
+  setEditingElementId: (id: string | null) => void;
+  findElementLayerIndex: (elementId: string) => number;
 }
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
@@ -260,6 +265,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     warningThreshold: 60,
     autoNextPhase: true,
   },
+  selectedElementId: null,
+  editingElementId: null,
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -279,28 +286,6 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     };
     set({ board: { ...board, layers } });
     socketService.drawElement(element, activeLayerIndex);
-  },
-
-  updateElement: (elementId, updates) => {
-    const { board, activeLayerIndex, canEdit } = get();
-    if (!board || !canEdit) return;
-    const layers = [...board.layers];
-    const elements = layers[activeLayerIndex].elements.map(el =>
-      el.id === elementId ? { ...el, ...updates } : el
-    );
-    layers[activeLayerIndex] = { ...layers[activeLayerIndex], elements };
-    set({ board: { ...board, layers } });
-    socketService.updateElement(elementId, updates, activeLayerIndex);
-  },
-
-  deleteElement: (elementId) => {
-    const { board, activeLayerIndex, canEdit } = get();
-    if (!board || !canEdit) return;
-    const layers = [...board.layers];
-    const elements = layers[activeLayerIndex].elements.filter(el => el.id !== elementId);
-    layers[activeLayerIndex] = { ...layers[activeLayerIndex], elements };
-    set({ board: { ...board, layers } });
-    socketService.deleteElement(elementId, activeLayerIndex);
   },
 
   addLayer: (name) => {
@@ -1545,5 +1530,45 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
   syncTimerState: (state) => {
     set({ timerState: state });
+  },
+
+  setSelectedElementId: (id) => set({ selectedElementId: id, editingElementId: null }),
+  setEditingElementId: (id) => set({ editingElementId: id }),
+
+  findElementLayerIndex: (elementId) => {
+    const { board } = get();
+    if (!board) return -1;
+    for (let i = 0; i < board.layers.length; i++) {
+      if (board.layers[i].elements.find(el => el.id === elementId)) {
+        return i;
+      }
+    }
+    return -1;
+  },
+
+  updateElement: (elementId, updates) => {
+    const { board, canEdit, findElementLayerIndex } = get();
+    if (!board || !canEdit) return;
+    const layerIndex = findElementLayerIndex(elementId);
+    if (layerIndex === -1) return;
+    const layers = [...board.layers];
+    const elements = layers[layerIndex].elements.map(el =>
+      el.id === elementId ? { ...el, ...updates } : el
+    );
+    layers[layerIndex] = { ...layers[layerIndex], elements };
+    set({ board: { ...board, layers } });
+    socketService.updateElement(elementId, updates, layerIndex);
+  },
+
+  deleteElement: (elementId) => {
+    const { board, canEdit, findElementLayerIndex } = get();
+    if (!board || !canEdit) return;
+    const layerIndex = findElementLayerIndex(elementId);
+    if (layerIndex === -1) return;
+    const layers = [...board.layers];
+    const elements = layers[layerIndex].elements.filter(el => el.id !== elementId);
+    layers[layerIndex] = { ...layers[layerIndex], elements };
+    set({ board: { ...board, layers }, selectedElementId: null, editingElementId: null });
+    socketService.deleteElement(elementId, layerIndex);
   },
 }));
