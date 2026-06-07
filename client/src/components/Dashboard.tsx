@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Board } from '../types';
-import { boardApi, templateApi } from '../services/api';
+import { Board, Team } from '../types';
+import { boardApi, templateApi, teamApi } from '../services/api';
 import { useWhiteboardStore } from '../store/whiteboard';
 import { TemplateCenter } from './TemplateCenter';
+import { CreateTeamModal } from './CreateTeamModal';
 
 interface DashboardProps {
   onBoardSelect: (board: Board) => void;
+  onTeamSelect: (teamId: string) => void;
 }
 
 const formatDate = (dateStr: string): string => {
@@ -129,10 +131,12 @@ const BoardCard: React.FC<{
   );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect, onTeamSelect }) => {
   const [boards, setBoards] = useState<Board[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [isTemplateCenterOpen, setIsTemplateCenterOpen] = useState(false);
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [showWelcomeTip, setShowWelcomeTip] = useState(false);
   const { username, unreadNotificationCount, showNotificationPanel, setShowNotificationPanel } = useWhiteboardStore((state) => ({
     username: state.username,
@@ -144,7 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
   const userId = 'user-1';
 
   useEffect(() => {
-    loadBoards();
+    loadAllData();
   }, []);
 
   useEffect(() => {
@@ -158,15 +162,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
     }
   }, [loading, boards]);
 
-  const loadBoards = async () => {
+  const loadAllData = async () => {
     try {
       setLoading(true);
-      const data = await boardApi.getBoards(userId);
-      setBoards(data);
+      const [boardsData, teamsData] = await Promise.all([
+        boardApi.getBoards(userId),
+        teamApi.getTeams(userId),
+      ]);
+      setBoards(boardsData);
+      setTeams(teamsData);
     } catch (error) {
-      console.error('Failed to load boards:', error);
+      console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateTeam = async (name: string, description: string) => {
+    try {
+      const newTeam = await teamApi.createTeam({ name, description, ownerId: userId });
+      setTeams((prev) => [newTeam, ...prev]);
+    } catch (error) {
+      console.error('Failed to create team:', error);
+      throw error;
     }
   };
 
@@ -179,7 +197,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
         newBoard = await boardApi.createBoard({ name, ownerId: userId });
       }
       if (newBoard) {
-        await loadBoards();
+        await loadAllData();
         onBoardSelect(newBoard);
       } else {
         throw new Error('Failed to create board');
@@ -555,6 +573,217 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
         </div>
 
         <section style={{ marginBottom: '40px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+            }}
+          >
+            <SectionHeader title="我的团队" count={loading ? undefined : teams.length} />
+            <button
+              onClick={() => setIsCreateTeamOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#667eea',
+                background: 'rgba(102, 126, 234, 0.1)',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              创建团队
+            </button>
+          </div>
+
+          {loading ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '16px',
+              }}
+            >
+              {[1, 2].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    borderRadius: '12px',
+                    height: '120px',
+                    background: '#e5e7eb',
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                  }}
+                />
+              ))}
+            </div>
+          ) : teams.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '40px 16px',
+                background: '#fff',
+                borderRadius: '12px',
+                border: '2px dashed #d1d5db',
+              }}
+            >
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  margin: '0 auto 12px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <p style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 500, color: '#1a1a1a' }}>
+                还没有团队空间
+              </p>
+              <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#6b7280' }}>
+                创建团队，和成员一起协作管理白板
+              </p>
+              <button
+                onClick={() => setIsCreateTeamOpen(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 20px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#fff',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                创建团队
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '16px',
+              }}
+            >
+              {teams.map((team) => (
+                <div
+                  key={team._id}
+                  onClick={() => onTeamSelect(team._id)}
+                  style={{
+                    background: '#fff',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <div
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        background: team.avatarColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        fontSize: '20px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {team.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: '15px',
+                          fontWeight: 600,
+                          color: '#1a1a1a',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {team.name}
+                      </h3>
+                      <p
+                        style={{
+                          margin: '4px 0 0',
+                          fontSize: '12px',
+                          color: '#6b7280',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {team.description || '暂无描述'}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#6b7280' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                      {team.members.length} 成员
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="9" y1="9" x2="15" y2="9" />
+                        <line x1="9" y1="15" x2="15" y2="15" />
+                      </svg>
+                      {boards.filter((b) => b.teamId === team._id).length} 白板
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginBottom: '40px' }}>
           <SectionHeader title="最近编辑" count={loading ? undefined : recentBoards.length} />
           <BoardGrid 
             boards={recentBoards.slice(0, 8)} 
@@ -590,6 +819,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
         }}
         onCreate={handleCreateBoard}
         showWelcome={showWelcomeTip}
+      />
+
+      <CreateTeamModal
+        isOpen={isCreateTeamOpen}
+        onClose={() => setIsCreateTeamOpen(false)}
+        onCreate={handleCreateTeam}
       />
     </div>
   );

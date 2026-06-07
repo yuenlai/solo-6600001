@@ -11,6 +11,7 @@ import { SnapshotHistoryPanel } from './components/SnapshotHistoryPanel';
 import { SearchPanel } from './components/SearchPanel';
 import { NotificationPanel } from './components/NotificationPanel';
 import { AssetPanel } from './components/AssetPanel';
+import { TeamSpace } from './components/TeamSpace';
 import { useWhiteboardStore } from './store/whiteboard';
 import { socketService } from './services/socket';
 import { boardApi } from './services/api';
@@ -21,6 +22,7 @@ const App: React.FC = () => {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [loadingSharedBoard, setLoadingSharedBoard] = useState(false);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
   const {
     board, setBoard, updateCursor, removeCursor, setCursors, username,
     canEdit, setCanEdit, setIsShareAccess, showCommentPanel, setShowCommentPanel,
@@ -266,9 +268,15 @@ const App: React.FC = () => {
     setIsShareAccess(false);
   };
 
+  const handleTeamSelect = (teamId: string) => {
+    setActiveTeamId(teamId);
+    setCurrentView('dashboard');
+  };
+
   const handleBackToDashboard = () => {
     setCurrentView('dashboard');
     setActiveBoard(null);
+    setActiveTeamId(null);
     setCanEdit(true);
     setIsShareAccess(false);
   };
@@ -312,10 +320,29 @@ const App: React.FC = () => {
     );
   }
 
+  if (activeTeamId) {
+    return (
+      <>
+        <TeamSpace
+          teamId={activeTeamId}
+          onBack={handleBackToDashboard}
+          onBoardSelect={handleBoardSelect}
+        />
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          board={activeBoard}
+          onBoardUpdate={handleBoardUpdate}
+        />
+        <NotificationPanel />
+      </>
+    );
+  }
+
   if (currentView === 'dashboard') {
     return (
       <>
-        <Dashboard onBoardSelect={handleBoardSelect} />
+        <Dashboard onBoardSelect={handleBoardSelect} onTeamSelect={handleTeamSelect} />
         <ShareModal
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}

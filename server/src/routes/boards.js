@@ -3,16 +3,23 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { Board, readBoards } = require('../storage');
 
-// Get all boards for a user
+// Get all boards for a user or team
 router.get('/', async (req, res) => {
   try {
-    const { userId } = req.query;
+    const { userId, teamId } = req.query;
+    
+    if (teamId) {
+      const boards = await Board.find({ teamId }).sort({ updatedAt: -1 }).exec();
+      console.log(`[Boards] Fetched ${boards.length} boards for team ${teamId}`);
+      return res.json(boards);
+    }
+    
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json({ error: 'userId or teamId is required' });
     }
     const boards = await Board.find({
       $or: [{ ownerId: userId }, { collaborators: userId }]
-    }).sort({ updatedAt: -1 });
+    }).sort({ updatedAt: -1 }).exec();
     console.log(`[Boards] Fetched ${boards.length} boards for user ${userId}`);
     res.json(boards);
   } catch (err) {
@@ -53,7 +60,7 @@ router.get('/:id', async (req, res) => {
 // Create a new board
 router.post('/', async (req, res) => {
   try {
-    const { name, ownerId, width, height, backgroundColor, layers } = req.body;
+    const { name, ownerId, teamId, width, height, backgroundColor, layers } = req.body;
 
     if (!ownerId) {
       return res.status(400).json({ error: 'ownerId is required' });
@@ -62,6 +69,7 @@ router.post('/', async (req, res) => {
     const boardData = {
       name: name || 'Untitled Board',
       ownerId,
+      teamId: teamId || null,
       width: width || 3000,
       height: height || 2000,
       backgroundColor: backgroundColor || '#ffffff',

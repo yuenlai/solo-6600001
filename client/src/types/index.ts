@@ -60,6 +60,7 @@ export interface Board {
   _id: string;
   name: string;
   ownerId: string;
+  teamId: string | null;
   collaborators: string[];
   layers: Layer[];
   comments: Comment[];
@@ -73,6 +74,26 @@ export interface Board {
   isShared?: boolean;
   shareToken?: string | null;
   sharePermission?: SharePermission;
+}
+
+export interface Team {
+  _id: string;
+  name: string;
+  description: string;
+  ownerId: string;
+  members: string[];
+  admins: string[];
+  avatarColor: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email?: string;
+  role: 'owner' | 'admin' | 'member';
+  avatar?: string;
 }
 
 export interface ShareResult {

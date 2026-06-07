@@ -25,9 +25,11 @@ initStorage();
 const boardRoutes = require('./routes/boards');
 const templateRoutes = require('./routes/templates');
 const notificationRoutes = require('./routes/notifications');
+const teamRoutes = require('./routes/teams');
 app.use('/api/boards', boardRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/teams', teamRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

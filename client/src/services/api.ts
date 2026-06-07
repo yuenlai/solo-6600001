@@ -1,12 +1,16 @@
-import { Board, Template, SharePermission, ShareResult, Comment, CommentReply, Snapshot, Poll, Notification } from '../types';
+import { Board, Template, SharePermission, ShareResult, Comment, CommentReply, Snapshot, Poll, Notification, Team } from '../types';
 
 const API_BASE_URL = '/api/boards';
 const TEMPLATE_API_URL = '/api/templates';
 const NOTIFICATION_API_URL = '/api/notifications';
+const TEAM_API_URL = '/api/teams';
 
 export const boardApi = {
-  async getBoards(userId: string): Promise<Board[]> {
-    const response = await fetch(`${API_BASE_URL}?userId=${userId}`);
+  async getBoards(userId: string, teamId?: string): Promise<Board[]> {
+    const url = teamId 
+      ? `${API_BASE_URL}?teamId=${teamId}` 
+      : `${API_BASE_URL}?userId=${userId}`;
+    const response = await fetch(url);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'Failed to fetch boards');
@@ -34,7 +38,7 @@ export const boardApi = {
     return response.json();
   },
 
-  async createBoard(data: { name: string; ownerId: string; width?: number; height?: number }): Promise<Board | null> {
+  async createBoard(data: { name: string; ownerId: string; teamId?: string; width?: number; height?: number }): Promise<Board | null> {
     const response = await fetch(API_BASE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -268,6 +272,7 @@ export const boardApi = {
         _id: 'board-1',
         name: '产品需求评审',
         ownerId: 'user-1',
+        teamId: 'team-1',
         collaborators: ['user-2', 'user-3'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
@@ -286,6 +291,7 @@ export const boardApi = {
         _id: 'board-2',
         name: '架构设计讨论',
         ownerId: 'user-1',
+        teamId: 'team-2',
         collaborators: ['user-4'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
@@ -304,6 +310,7 @@ export const boardApi = {
         _id: 'board-3',
         name: '用户旅程地图',
         ownerId: 'user-2',
+        teamId: 'team-1',
         collaborators: ['user-1', 'user-5'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
@@ -322,6 +329,7 @@ export const boardApi = {
         _id: 'board-4',
         name: '团队脑暴会',
         ownerId: 'user-3',
+        teamId: null,
         collaborators: ['user-1'],
         layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
         comments: [],
@@ -339,12 +347,13 @@ export const boardApi = {
     ];
   },
 
-  createMockBoard(data: { name: string; ownerId: string }): Board {
+  createMockBoard(data: { name: string; ownerId: string; teamId?: string }): Board {
     const now = new Date().toISOString();
     return {
       _id: `board-${Date.now()}`,
       name: data.name,
       ownerId: data.ownerId,
+      teamId: data.teamId || null,
       collaborators: [],
       layers: [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
       comments: [],
@@ -411,13 +420,14 @@ const mockTemplates: Template[] = [
 
 const createMockBoardFromTemplate = (
   template: Template,
-  data: { name: string; ownerId: string }
+  data: { name: string; ownerId: string; teamId?: string }
 ): Board => {
   const now = new Date().toISOString();
   return {
     _id: `board-${Date.now()}`,
     name: data.name || template.name,
     ownerId: data.ownerId,
+    teamId: data.teamId || null,
     collaborators: [],
     layers: template.layers || [{ name: '图层 1', visible: true, locked: false, order: 0, elements: [] }],
     comments: [],
@@ -464,7 +474,7 @@ export const templateApi = {
 
   async createBoardFromTemplate(
     templateId: string,
-    data: { name: string; ownerId: string }
+    data: { name: string; ownerId: string; teamId?: string }
   ): Promise<Board | null> {
     try {
       const response = await fetch(`${TEMPLATE_API_URL}/${templateId}/create`, {
@@ -546,5 +556,146 @@ export const notificationApi = {
       throw new Error(errorData.error || 'Failed to create notification');
     }
     return response.json();
+  },
+};
+
+export const teamApi = {
+  async getTeams(userId: string): Promise<Team[]> {
+    const response = await fetch(`${TEAM_API_URL}?userId=${userId}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch teams');
+    }
+    return response.json();
+  },
+
+  async getTeam(teamId: string): Promise<Team | null> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch team');
+    }
+    return response.json();
+  },
+
+  async createTeam(data: { name: string; description?: string; ownerId: string }): Promise<Team> {
+    const response = await fetch(TEAM_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create team');
+    }
+    return response.json();
+  },
+
+  async updateTeam(teamId: string, data: { name?: string; description?: string }): Promise<Team> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to update team');
+    }
+    return response.json();
+  },
+
+  async deleteTeam(teamId: string): Promise<boolean> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to delete team');
+    }
+    return response.ok;
+  },
+
+  async addMembers(teamId: string, memberIds: string[]): Promise<Team> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberIds }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to add members');
+    }
+    return response.json();
+  },
+
+  async removeMember(teamId: string, memberId: string): Promise<Team> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}/members/${memberId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to remove member');
+    }
+    return response.json();
+  },
+
+  async addAdmins(teamId: string, adminIds: string[]): Promise<Team> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}/admins`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminIds }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to add admins');
+    }
+    return response.json();
+  },
+
+  async removeAdmin(teamId: string, adminId: string): Promise<Team> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}/admins/${adminId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to remove admin');
+    }
+    return response.json();
+  },
+
+  async getTeamBoards(teamId: string): Promise<Board[]> {
+    const response = await fetch(`${TEAM_API_URL}/${teamId}/boards`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch team boards');
+    }
+    return response.json();
+  },
+
+  getMockTeams(): Team[] {
+    const now = new Date().toISOString();
+    return [
+      {
+        _id: 'team-1',
+        name: '产品设计团队',
+        description: '负责产品设计和用户体验的团队',
+        ownerId: 'user-1',
+        members: ['user-1', 'user-2', 'user-3'],
+        admins: ['user-1'],
+        avatarColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        _id: 'team-2',
+        name: '技术研发团队',
+        description: '负责产品研发和技术架构的团队',
+        ownerId: 'user-1',
+        members: ['user-1', 'user-4', 'user-5'],
+        admins: ['user-1', 'user-4'],
+        avatarColor: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
   },
 };
