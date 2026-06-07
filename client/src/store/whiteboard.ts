@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification, Asset, TimerPhase, TimerState, TimerSettings } from '../types';
+import { Board, BoardElement, CursorPosition, CanvasTransform, ToolType, Layer, Comment, CommentReply, PresentationStep, TaskCardData, Snapshot, Poll, HostInfo, FollowState, NoteGroup, SearchResult, Notification, Asset, TimerPhase, TimerState, TimerSettings, SyncState, PendingOperation } from '../types';
 import { socketService } from '../services/socket';
 import { boardApi, notificationApi } from '../services/api';
 import { groupStickyNotes, autoArrangeGroups as autoArrangeGroupsUtil, addToGroup, removeFromGroup, mergeGroups } from '../utils/noteGrouping';
@@ -62,8 +62,19 @@ interface WhiteboardState {
   timerSettings: TimerSettings;
   selectedElementId: string | null;
   editingElementId: string | null;
+  syncState: SyncState;
+  locallyUpdatedElementIds: Set<string>;
 
   // Actions
+  setSyncState: (state: Partial<SyncState>) => void;
+  addPendingOperation: (op: Omit<PendingOperation, 'id' | 'timestamp' | 'retries'>) => void;
+  removePendingOperation: (opId: string) => void;
+  markElementSynced: (elementId: string) => void;
+  markElementError: (elementId: string) => void;
+  addLocallyUpdatedElement: (elementId: string) => void;
+  removeLocallyUpdatedElement: (elementId: string) => void;
+  clearLocallyUpdatedElements: () => void;
+  processPendingOperations: () => void;
   setBoard: (board: Board) => void;
   setActiveTool: (tool: ToolType) => void;
   setStrokeColor: (color: string) => void;
@@ -267,6 +278,117 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
   selectedElementId: null,
   editingElementId: null,
+  syncState: {
+    isOnline: true,
+    pendingOperations: [],
+    lastSyncTime: null,
+    syncError: null,
+  },
+  locallyUpdatedElementIds: new Set(),
+
+  setSyncState: (state) => set((prev) => ({
+    syncState: { ...prev.syncState, ...state }
+  })),
+
+  addPendingOperation: (op) => set((prev) => {
+    const newOp: PendingOperation = {
+      ...op,
+      id: uuidv4(),
+      timestamp: Date.now(),
+      retries: 0,
+    };
+    return {
+      syncState: {
+        ...prev.syncState,
+        pendingOperations: [...prev.syncState.pendingOperations, newOp]
+      }
+    };
+  }),
+
+  removePendingOperation: (opId) => set((prev) => ({
+    syncState: {
+      ...prev.syncState,
+      pendingOperations: prev.syncState.pendingOperations.filter(op => op.id !== opId)
+    }
+  })),
+
+  markElementSynced: (elementId) => set((prev) => {
+    if (!prev.board) return {};
+    const layers = prev.board.layers.map(layer => ({
+      ...layer,
+      elements: layer.elements.map(el =>
+        el.id === elementId ? { ...el, syncStatus: 'synced' as const, lastUpdatedAt: Date.now() } : el
+      )
+    }));
+    return { board: { ...prev.board, layers } };
+  }),
+
+  markElementError: (elementId) => set((prev) => {
+    if (!prev.board) return {};
+    const layers = prev.board.layers.map(layer => ({
+      ...layer,
+      elements: layer.elements.map(el =>
+        el.id === elementId ? { ...el, syncStatus: 'error' as const } : el
+      )
+    }));
+    return { board: { ...prev.board, layers } };
+  }),
+
+  addLocallyUpdatedElement: (elementId) => set((prev) => {
+    const newSet = new Set(prev.locallyUpdatedElementIds);
+    newSet.add(elementId);
+    return { locallyUpdatedElementIds: newSet };
+  }),
+
+  removeLocallyUpdatedElement: (elementId) => set((prev) => {
+    const newSet = new Set(prev.locallyUpdatedElementIds);
+    newSet.delete(elementId);
+    return { locallyUpdatedElementIds: newSet };
+  }),
+
+  clearLocallyUpdatedElements: () => set({ locallyUpdatedElementIds: new Set() }),
+
+  processPendingOperations: () => {
+    const { syncState } = get();
+    if (syncState.pendingOperations.length === 0) return;
+    
+    const op = syncState.pendingOperations[0];
+    const socket = socketService.getSocket();
+    
+    if (!socket || !socket.connected) {
+      get().setSyncState({ isOnline: false, syncError: '连接断开，正在重连...' });
+      return;
+    }
+
+    get().setSyncState({ isOnline: true, syncError: null });
+
+    switch (op.type) {
+      case 'add':
+        if (op.element) {
+          socketService.drawElement(op.element, op.layerIndex);
+        }
+        break;
+      case 'update':
+        if (op.updates) {
+          socketService.updateElement(op.elementId, op.updates, op.layerIndex);
+        }
+        break;
+      case 'delete':
+        socketService.deleteElement(op.elementId, op.layerIndex);
+        break;
+    }
+
+    setTimeout(() => {
+      get().removePendingOperation(op.id);
+      get().markElementSynced(op.elementId);
+      get().removeLocallyUpdatedElement(op.elementId);
+      get().setSyncState({ lastSyncTime: Date.now() });
+      
+      if (get().syncState.pendingOperations.length > 0) {
+        get().processPendingOperations();
+      }
+    }, 50);
+  },
 
   setBoard: (board) => set({ board }),
   setActiveTool: (tool) => set({ activeTool: tool }),
@@ -277,15 +399,33 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   clearNewlyCreatedLayerIndex: () => set({ newlyCreatedLayerIndex: null }),
 
   addElement: (element) => {
-    const { board, activeLayerIndex, canEdit } = get();
+    const { board, activeLayerIndex, canEdit, addPendingOperation, addLocallyUpdatedElement, processPendingOperations, syncState } = get();
     if (!board || !canEdit) return;
+    
+    const elementWithSync: BoardElement = {
+      ...element,
+      syncStatus: 'syncing',
+      lastUpdatedAt: Date.now(),
+    };
+    
     const layers = [...board.layers];
     layers[activeLayerIndex] = {
       ...layers[activeLayerIndex],
-      elements: [...layers[activeLayerIndex].elements, element]
+      elements: [...layers[activeLayerIndex].elements, elementWithSync]
     };
     set({ board: { ...board, layers } });
-    socketService.drawElement(element, activeLayerIndex);
+    
+    addLocallyUpdatedElement(element.id);
+    addPendingOperation({
+      type: 'add',
+      elementId: element.id,
+      element: elementWithSync,
+      layerIndex: activeLayerIndex,
+    });
+    
+    if (syncState.pendingOperations.length === 0) {
+      setTimeout(() => processPendingOperations(), 0);
+    }
   },
 
   addLayer: (name) => {
@@ -1547,21 +1687,33 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   updateElement: (elementId, updates) => {
-    const { board, canEdit, findElementLayerIndex } = get();
+    const { board, canEdit, findElementLayerIndex, addPendingOperation, addLocallyUpdatedElement, processPendingOperations, syncState } = get();
     if (!board || !canEdit) return;
     const layerIndex = findElementLayerIndex(elementId);
     if (layerIndex === -1) return;
+    
     const layers = [...board.layers];
     const elements = layers[layerIndex].elements.map(el =>
-      el.id === elementId ? { ...el, ...updates } : el
+      el.id === elementId ? { ...el, ...updates, syncStatus: 'syncing' as const, lastUpdatedAt: Date.now() } : el
     );
     layers[layerIndex] = { ...layers[layerIndex], elements };
     set({ board: { ...board, layers } });
-    socketService.updateElement(elementId, updates, layerIndex);
+    
+    addLocallyUpdatedElement(elementId);
+    addPendingOperation({
+      type: 'update',
+      elementId,
+      updates,
+      layerIndex,
+    });
+    
+    if (syncState.pendingOperations.length === 0) {
+      setTimeout(() => processPendingOperations(), 0);
+    }
   },
 
   deleteElement: (elementId) => {
-    const { board, canEdit, findElementLayerIndex } = get();
+    const { board, canEdit, findElementLayerIndex, addPendingOperation, addLocallyUpdatedElement, processPendingOperations, syncState } = get();
     if (!board || !canEdit) return;
     const layerIndex = findElementLayerIndex(elementId);
     if (layerIndex === -1) return;
@@ -1569,6 +1721,16 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     const elements = layers[layerIndex].elements.filter(el => el.id !== elementId);
     layers[layerIndex] = { ...layers[layerIndex], elements };
     set({ board: { ...board, layers }, selectedElementId: null, editingElementId: null });
-    socketService.deleteElement(elementId, layerIndex);
+    
+    addLocallyUpdatedElement(elementId);
+    addPendingOperation({
+      type: 'delete',
+      elementId,
+      layerIndex,
+    });
+    
+    if (syncState.pendingOperations.length === 0) {
+      setTimeout(() => processPendingOperations(), 0);
+    }
   },
 }));

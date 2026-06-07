@@ -543,6 +543,14 @@ export const WhiteboardCanvas: React.FC = () => {
           ctx.strokeStyle = el.stroke || '#000';
           ctx.fillStyle = el.fill || 'transparent';
           ctx.lineWidth = el.strokeWidth || 2;
+          
+          if (el.syncStatus === 'syncing') {
+            ctx.shadowColor = 'rgba(33, 150, 243, 0.6)';
+            ctx.shadowBlur = 8;
+          } else if (el.syncStatus === 'error') {
+            ctx.shadowColor = 'rgba(244, 67, 54, 0.6)';
+            ctx.shadowBlur = 8;
+          }
 
           switch (el.type) {
             case 'path':
@@ -620,6 +628,62 @@ export const WhiteboardCanvas: React.FC = () => {
               }
               break;
           }
+          
+          if (el.syncStatus === 'syncing' || el.syncStatus === 'error') {
+            ctx.shadowBlur = 0;
+            const indicatorSize = 12;
+            let indicatorX = el.x;
+            let indicatorY = el.y - indicatorSize - 4;
+            
+            if (el.type === 'circle') {
+              indicatorX = el.x - (el.width || 0) / 2;
+              indicatorY = el.y - (el.height || 0) / 2 - indicatorSize - 4;
+            } else if (el.type === 'text') {
+              indicatorY = el.y - 20 - indicatorSize - 4;
+            }
+            
+            if (el.type === 'path' || el.type === 'line') {
+              if (el.points && el.points.length >= 2) {
+                indicatorX = el.points[0];
+                indicatorY = el.points[1] - indicatorSize - 4;
+              }
+            }
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2, indicatorSize / 2, 0, Math.PI * 2);
+            
+            if (el.syncStatus === 'syncing') {
+              ctx.fillStyle = '#2196f3';
+              ctx.fill();
+              ctx.strokeStyle = '#fff';
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+              
+              const time = Date.now() / 500;
+              ctx.beginPath();
+              ctx.moveTo(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2);
+              ctx.arc(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2, indicatorSize / 3, -Math.PI / 2, -Math.PI / 2 + time * Math.PI);
+              ctx.strokeStyle = '#fff';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            } else if (el.syncStatus === 'error') {
+              ctx.fillStyle = '#f44336';
+              ctx.fill();
+              ctx.strokeStyle = '#fff';
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+              
+              ctx.fillStyle = '#fff';
+              ctx.font = 'bold 10px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('!', indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2);
+            }
+            
+            ctx.restore();
+          }
+          
           ctx.restore();
         });
       });
@@ -986,11 +1050,49 @@ export const WhiteboardCanvas: React.FC = () => {
     };
   }, [resetView, zoomIn, zoomOut, selectedElementId, editingElementId, canEdit, deleteElement, setSelectedElementId, setEditingElementId]);
 
+  // Sync status indicator animation loop
+  const syncAnimationRef = useRef<number | null>(null);
+  useEffect(() => {
+    let hasSyncingElements = false;
+    if (board) {
+      for (const layer of board.layers) {
+        for (const el of layer.elements) {
+          if (el.syncStatus === 'syncing' || el.syncStatus === 'error') {
+            hasSyncingElements = true;
+            break;
+          }
+        }
+        if (hasSyncingElements) break;
+      }
+    }
+
+    if (hasSyncingElements && !syncAnimationRef.current) {
+      const animate = () => {
+        forceUpdate({});
+        syncAnimationRef.current = requestAnimationFrame(animate);
+      };
+      syncAnimationRef.current = requestAnimationFrame(animate);
+    } else if (!hasSyncingElements && syncAnimationRef.current) {
+      cancelAnimationFrame(syncAnimationRef.current);
+      syncAnimationRef.current = null;
+    }
+
+    return () => {
+      if (syncAnimationRef.current) {
+        cancelAnimationFrame(syncAnimationRef.current);
+        syncAnimationRef.current = null;
+      }
+    };
+  }, [board]);
+
   // Cleanup animation frame on unmount
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (syncAnimationRef.current) {
+        cancelAnimationFrame(syncAnimationRef.current);
       }
     };
   }, []);

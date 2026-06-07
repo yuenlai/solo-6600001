@@ -32,7 +32,7 @@ const App: React.FC = () => {
     isHost, followState, loadNotifications, loadUnreadCount,
     addNotification, unreadNotificationCount, showNotificationPanel,
     setShowNotificationPanel, loadAssets, showTimerPanel, setShowTimerPanel,
-    syncTimerState
+    syncTimerState, syncState
   } = useWhiteboardStore();
 
   useEffect(() => {
@@ -102,19 +102,26 @@ const App: React.FC = () => {
         updateCursor(data);
       });
       socketService.onElementAdded((data: { element: BoardElement; layerIndex: number }) => {
-        const { board: currentBoard } = useWhiteboardStore.getState();
+        const { board: currentBoard, locallyUpdatedElementIds } = useWhiteboardStore.getState();
         if (currentBoard) {
+          if (locallyUpdatedElementIds.has(data.element.id)) {
+            return;
+          }
           const layers = [...currentBoard.layers];
+          const elementWithSync = { ...data.element, syncStatus: 'synced' as const, lastUpdatedAt: Date.now() };
           layers[data.layerIndex] = {
             ...layers[data.layerIndex],
-            elements: [...layers[data.layerIndex].elements, data.element]
+            elements: [...layers[data.layerIndex].elements, elementWithSync]
           };
           setBoard({ ...currentBoard, layers });
         }
       });
       socketService.onElementUpdated((data: { elementId: string; updates: Partial<BoardElement>; layerIndex: number }) => {
-        const { board: currentBoard } = useWhiteboardStore.getState();
+        const { board: currentBoard, locallyUpdatedElementIds } = useWhiteboardStore.getState();
         if (currentBoard) {
+          if (locallyUpdatedElementIds.has(data.elementId)) {
+            return;
+          }
           const layers = [...currentBoard.layers];
           let targetLayerIndex = data.layerIndex;
           if (targetLayerIndex < 0 || targetLayerIndex >= layers.length || !layers[targetLayerIndex].elements.find(el => el.id === data.elementId)) {
@@ -127,7 +134,7 @@ const App: React.FC = () => {
           }
           if (targetLayerIndex >= 0 && targetLayerIndex < layers.length) {
             const elements = layers[targetLayerIndex].elements.map(el =>
-              el.id === data.elementId ? { ...el, ...data.updates } : el
+              el.id === data.elementId ? { ...el, ...data.updates, syncStatus: 'synced' as const, lastUpdatedAt: Date.now() } : el
             );
             layers[targetLayerIndex] = { ...layers[targetLayerIndex], elements };
             setBoard({ ...currentBoard, layers });
@@ -135,8 +142,11 @@ const App: React.FC = () => {
         }
       });
       socketService.onElementDeleted((data: { elementId: string; layerIndex: number }) => {
-        const { board: currentBoard } = useWhiteboardStore.getState();
+        const { board: currentBoard, locallyUpdatedElementIds } = useWhiteboardStore.getState();
         if (currentBoard) {
+          if (locallyUpdatedElementIds.has(data.elementId)) {
+            return;
+          }
           const layers = [...currentBoard.layers];
           let targetLayerIndex = data.layerIndex;
           if (targetLayerIndex < 0 || targetLayerIndex >= layers.length || !layers[targetLayerIndex].elements.find(el => el.id === data.elementId)) {
@@ -155,8 +165,11 @@ const App: React.FC = () => {
         }
       });
       socketService.onTaskCardUpdated((data: { elementId: string; taskData: any; layerIndex: number }) => {
-        const { board: currentBoard } = useWhiteboardStore.getState();
+        const { board: currentBoard, locallyUpdatedElementIds } = useWhiteboardStore.getState();
         if (currentBoard) {
+          if (locallyUpdatedElementIds.has(data.elementId)) {
+            return;
+          }
           const layers = [...currentBoard.layers];
           let targetLayerIndex = data.layerIndex;
           if (targetLayerIndex < 0 || targetLayerIndex >= layers.length || !layers[targetLayerIndex].elements.find(el => el.id === data.elementId)) {
@@ -169,7 +182,7 @@ const App: React.FC = () => {
           }
           if (targetLayerIndex >= 0 && targetLayerIndex < layers.length) {
             const elements = layers[targetLayerIndex].elements.map(el =>
-              el.id === data.elementId ? { ...el, taskData: { ...el.taskData, ...data.taskData } } : el
+              el.id === data.elementId ? { ...el, taskData: { ...el.taskData, ...data.taskData }, syncStatus: 'synced' as const, lastUpdatedAt: Date.now() } : el
             );
             layers[targetLayerIndex] = { ...layers[targetLayerIndex], elements };
             setBoard({ ...currentBoard, layers });
@@ -494,6 +507,41 @@ const App: React.FC = () => {
               👁️ 跟随 {followState.hostUsername}
             </span>
           )}
+          {currentView === 'board' && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: syncState.isOnline ? '#059669' : '#dc2626',
+              background: syncState.isOnline ? '#d1fae5' : '#fee2e2',
+              padding: '2px 8px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title={syncState.isOnline ? '已连接' : '连接断开'}
+            >
+              {syncState.isOnline ? (
+                syncState.pendingOperations.length > 0 ? (
+                  <>
+                    <span style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#059669',
+                      animation: 'pulse 1.5s ease-in-out infinite'
+                    }} />
+                    同步中 ({syncState.pendingOperations.length})
+                  </>
+                ) : (
+                  <>● 已同步</>
+                )
+              ) : (
+                <>⚠ 离线</>
+              )}
+            </span>
+          )}
         </div>
         <div style={{ flex: 1 }} />
         <button
@@ -706,6 +754,18 @@ const App: React.FC = () => {
         onBoardUpdate={handleBoardUpdate}
       />
       <NotificationPanel />
+      <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.5;
+            transform: scale(1.2);
+          }
+        }
+      `}</style>
     </div>
   );
 };

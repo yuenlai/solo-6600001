@@ -10,6 +10,8 @@ export interface TaskCardData {
   dueDate?: string;
 }
 
+export type SyncStatus = 'synced' | 'syncing' | 'error';
+
 export interface BoardElement {
   id: string;
   type: 'path' | 'rect' | 'circle' | 'text' | 'sticky-note' | 'line' | 'image' | 'task-card';
@@ -33,6 +35,9 @@ export interface BoardElement {
   borderTopRightRadius?: number;
   taskData?: TaskCardData;
   imageSrc?: string;
+  syncStatus?: SyncStatus;
+  lastUpdatedAt?: number;
+  createdBy?: string;
 }
 
 export interface Asset {
@@ -312,4 +317,24 @@ export interface TimerSettings {
   soundEnabled: boolean;
   warningThreshold: number;
   autoNextPhase: boolean;
+}
+
+export type OperationType = 'add' | 'update' | 'delete';
+
+export interface PendingOperation {
+  id: string;
+  type: OperationType;
+  elementId: string;
+  element?: BoardElement;
+  updates?: Partial<BoardElement>;
+  layerIndex: number;
+  timestamp: number;
+  retries: number;
+}
+
+export interface SyncState {
+  isOnline: boolean;
+  pendingOperations: PendingOperation[];
+  lastSyncTime: number | null;
+  syncError: string | null;
 }
