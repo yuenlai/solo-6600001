@@ -13,6 +13,7 @@ interface WhiteboardState {
   fillColor: string;
   strokeWidth: number;
   activeLayerIndex: number;
+  newlyCreatedLayerIndex: number | null;
   cursors: Map<string, CursorPosition>;
   canvasTransform: CanvasTransform;
   username: string;
@@ -66,6 +67,7 @@ interface WhiteboardState {
   setFillColor: (color: string) => void;
   setStrokeWidth: (width: number) => void;
   setActiveLayerIndex: (index: number) => void;
+  clearNewlyCreatedLayerIndex: () => void;
   addElement: (element: BoardElement) => void;
   updateElement: (elementId: string, updates: Partial<BoardElement>) => void;
   deleteElement: (elementId: string) => void;
@@ -194,6 +196,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   fillColor: 'transparent',
   strokeWidth: 2,
   activeLayerIndex: 0,
+  newlyCreatedLayerIndex: null,
   cursors: new Map(),
   canvasTransform: { scale: 1, translateX: 0, translateY: 0 },
   username: `User_${Math.random().toString(36).substr(2, 6)}`,
@@ -262,7 +265,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setStrokeColor: (color) => set({ strokeColor: color }),
   setFillColor: (color) => set({ fillColor: color }),
   setStrokeWidth: (width) => set({ strokeWidth: width }),
-  setActiveLayerIndex: (index) => set({ activeLayerIndex: index }),
+  setActiveLayerIndex: (index) => set({ activeLayerIndex: index, newlyCreatedLayerIndex: null }),
+  clearNewlyCreatedLayerIndex: () => set({ newlyCreatedLayerIndex: null }),
 
   addElement: (element) => {
     const { board, activeLayerIndex, canEdit } = get();
@@ -303,7 +307,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     if (!board || !canEdit) return;
     const newLayer: Layer = { name, visible: true, locked: false, order: board.layers.length, elements: [] };
     const layers = [...board.layers, newLayer];
-    set({ board: { ...board, layers }, activeLayerIndex: layers.length - 1 });
+    const newIndex = layers.length - 1;
+    set({ board: { ...board, layers }, activeLayerIndex: newIndex, newlyCreatedLayerIndex: newIndex });
     socketService.updateLayers(layers);
   },
 
