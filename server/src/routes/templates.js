@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Board = require('../models/Board');
+const { Board } = require('../storage');
 const { getTemplates, getTemplateById } = require('../templates');
 
 router.get('/', (req, res) => {

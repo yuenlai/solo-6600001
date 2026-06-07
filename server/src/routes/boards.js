@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Board = require('../models/Board');
+const { Board } = require('../storage');
 
 // Get all boards for a user
 router.get('/', async (req, res) => {
