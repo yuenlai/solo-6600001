@@ -19,8 +19,10 @@ export const WhiteboardCanvas: React.FC = () => {
   const isPanningRef = useRef(false);
   const currentPathRef = useRef<number[]>([]);
   const startPosRef = useRef({ x: 0, y: 0 });
+  const currentMousePosRef = useRef({ x: 0, y: 0 });
   const panStartRef = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
   const [, forceUpdate] = useState({});
+  const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
 
   const [addingComment, setAddingComment] = useState<{
     position: { x: number; y: number };
@@ -130,6 +132,9 @@ export const WhiteboardCanvas: React.FC = () => {
   }, [canEdit, getCanvasPoint, activeTool, findElementAtPoint, canvasTransform, followState.isFollowing, stopFollowingHost]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const point = getCanvasPoint(e);
+    currentMousePosRef.current = point;
+
     if (isPanningRef.current) {
       const dx = e.clientX - panStartRef.current.x;
       const dy = e.clientY - panStartRef.current.y;
@@ -141,11 +146,14 @@ export const WhiteboardCanvas: React.FC = () => {
       return;
     }
 
-    const point = getCanvasPoint(e);
     socketService.moveCursor(point.x, point.y);
 
-    if (!isDrawingRef.current || !canEdit) return;
+    if (!isDrawingRef.current || !canEdit) {
+      forceUpdate({});
+      return;
+    }
     currentPathRef.current.push(point.x, point.y);
+    forceUpdate({});
   }, [canEdit, getCanvasPoint, canvasTransform, setCanvasTransform]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -415,9 +423,135 @@ export const WhiteboardCanvas: React.FC = () => {
           }
         });
       }
+
+      if (canEdit && !isPresentationMode) {
+        const mousePos = currentMousePosRef.current;
+        const isDrawing = isDrawingRef.current;
+
+        ctx.save();
+
+        if (isDrawing) {
+          switch (activeTool) {
+            case 'pen':
+              if (currentPathRef.current.length >= 2) {
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = strokeWidth;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(currentPathRef.current[0], currentPathRef.current[1]);
+                for (let i = 2; i < currentPathRef.current.length; i += 2) {
+                  ctx.lineTo(currentPathRef.current[i], currentPathRef.current[i + 1]);
+                }
+                ctx.stroke();
+              }
+              break;
+            case 'rect':
+              const rectX = Math.min(startPosRef.current.x, mousePos.x);
+              const rectY = Math.min(startPosRef.current.y, mousePos.y);
+              const rectW = Math.abs(mousePos.x - startPosRef.current.x);
+              const rectH = Math.abs(mousePos.y - startPosRef.current.y);
+              ctx.globalAlpha = 0.6;
+              ctx.fillStyle = fillColor;
+              ctx.strokeStyle = strokeColor;
+              ctx.lineWidth = strokeWidth;
+              ctx.setLineDash([5, 5]);
+              ctx.beginPath();
+              ctx.rect(rectX, rectY, rectW, rectH);
+              if (fillColor && fillColor !== 'transparent') ctx.fill();
+              ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = '#666';
+              ctx.font = '12px sans-serif';
+              ctx.fillText(`${Math.round(rectW)} × ${Math.round(rectH)}`, rectX + rectW + 8, rectY + 12);
+              break;
+            case 'circle':
+              const cx = (startPosRef.current.x + mousePos.x) / 2;
+              const cy = (startPosRef.current.y + mousePos.y) / 2;
+              const rx = Math.abs(mousePos.x - startPosRef.current.x) / 2;
+              const ry = Math.abs(mousePos.y - startPosRef.current.y) / 2;
+              ctx.globalAlpha = 0.6;
+              ctx.fillStyle = fillColor;
+              ctx.strokeStyle = strokeColor;
+              ctx.lineWidth = strokeWidth;
+              ctx.setLineDash([5, 5]);
+              ctx.beginPath();
+              ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+              if (fillColor && fillColor !== 'transparent') ctx.fill();
+              ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = '#666';
+              ctx.font = '12px sans-serif';
+              ctx.fillText(`${Math.round(rx * 2)} × ${Math.round(ry * 2)}`, cx + rx + 8, cy - ry + 12);
+              break;
+            case 'line':
+              ctx.strokeStyle = strokeColor;
+              ctx.lineWidth = strokeWidth;
+              ctx.lineCap = 'round';
+              ctx.setLineDash([5, 5]);
+              ctx.beginPath();
+              ctx.moveTo(startPosRef.current.x, startPosRef.current.y);
+              ctx.lineTo(mousePos.x, mousePos.y);
+              ctx.stroke();
+              ctx.setLineDash([]);
+              const lineLength = Math.sqrt(
+                Math.pow(mousePos.x - startPosRef.current.x, 2) +
+                Math.pow(mousePos.y - startPosRef.current.y, 2)
+              );
+              ctx.fillStyle = '#666';
+              ctx.font = '12px sans-serif';
+              ctx.fillText(`${Math.round(lineLength)}px`, mousePos.x + 8, mousePos.y - 8);
+              break;
+          }
+        } else if (isHoveringCanvas) {
+          switch (activeTool) {
+            case 'sticky-note':
+              ctx.globalAlpha = 0.4;
+              ctx.fillStyle = '#FFF59D';
+              ctx.strokeStyle = '#F9A825';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([4, 4]);
+              ctx.fillRect(mousePos.x, mousePos.y, 160, 120);
+              ctx.strokeRect(mousePos.x, mousePos.y, 160, 120);
+              ctx.setLineDash([]);
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = '#999';
+              ctx.font = '14px sans-serif';
+              ctx.fillText('点击创建便签', mousePos.x + 10, mousePos.y + 65);
+              break;
+            case 'text':
+              ctx.globalAlpha = 0.5;
+              ctx.fillStyle = strokeColor;
+              ctx.font = '16px sans-serif';
+              ctx.fillText('|', mousePos.x, mousePos.y);
+              ctx.globalAlpha = 0.3;
+              ctx.fillText('文本内容', mousePos.x, mousePos.y);
+              ctx.globalAlpha = 1;
+              break;
+            case 'task-card':
+              ctx.globalAlpha = 0.4;
+              ctx.fillStyle = '#ffffff';
+              ctx.strokeStyle = '#9ca3af';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([4, 4]);
+              ctx.fillRect(mousePos.x, mousePos.y, 240, 160);
+              ctx.strokeRect(mousePos.x, mousePos.y, 240, 160);
+              ctx.setLineDash([]);
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = '#999';
+              ctx.font = '14px sans-serif';
+              ctx.fillText('点击创建任务卡片', mousePos.x + 10, mousePos.y + 85);
+              break;
+          }
+        }
+
+        ctx.restore();
+      }
     }
     ctx.restore();
-  }, [board, canvasTransform, searchResults, selectedSearchResultId]);
+  }, [board, canvasTransform, searchResults, selectedSearchResultId, activeTool, strokeColor, fillColor, strokeWidth, canEdit, isPresentationMode, isHoveringCanvas]);
 
   // Handle wheel zoom
   useEffect(() => {
@@ -537,9 +671,11 @@ export const WhiteboardCanvas: React.FC = () => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseEnter={() => setIsHoveringCanvas(true)}
         onMouseLeave={() => { 
           isDrawingRef.current = false; 
           isPanningRef.current = false;
+          setIsHoveringCanvas(false);
         }}
       />
 
